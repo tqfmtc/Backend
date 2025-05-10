@@ -20,9 +20,9 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://muhalla-tuition-center.netlify.app', 'https://muhalla-tuition-center.netlify.app'], // Allow both Vite default ports
-  credentials: true
-}));
+    origin: 'https://muhalla-tuition-center.netlify.app',
+    credentials: true
+  }));
 app.use(express.json());
 app.use(morgan('dev'));
 
