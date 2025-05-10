@@ -20,7 +20,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'], // Allow both Vite default ports
+  origin: ['https://muhalla-tuition-center.netlify.app', 'https://muhalla-tuition-center.netlify.app'], // Allow both Vite default ports
   credentials: true
 }));
 app.use(express.json());
