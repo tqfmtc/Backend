@@ -4,7 +4,7 @@ import Center from '../models/Center.js';
 import { startOfMonth, endOfMonth, format, eachDayOfInterval } from 'date-fns';
 
 // Mark attendance for a tutor (by Admin)
-export const markAttendance = async (req, res) => {
+export const  markAttendance = async (req, res) => {
   try {
     const { tutorId, centerId, date, status } = req.body;
     const adminId = req.user._id; // Admin who is marking

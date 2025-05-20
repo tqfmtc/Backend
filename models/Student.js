@@ -5,6 +5,11 @@ const studentSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a name']
   },
+  status: { 
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  },
   fatherName: {
     type: String,
     required: [true, 'Please add father\'s name']

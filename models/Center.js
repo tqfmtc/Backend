@@ -5,6 +5,11 @@ const centerSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add a center name']
   },
+  status: { 
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  },
   location: {
     type: String,
     required: [true, 'Please add a location']
