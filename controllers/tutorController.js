@@ -288,18 +288,20 @@ export const deleteTutor = async (req, res) => {
       center.tutors = center.tutors.filter(id => id.toString() !== tutor._id.toString());
       await center.save();
     }
+    tutor.status = 'inactive';
+    await tutor.save();
 
     // Important: Update all students to clear the assignedTutor field
     // This keeps the students but removes the reference to the deleted tutor
     const Student = (await import('../models/Student.js')).default;
-    const studentUpdateResult = await Student.updateMany(
-      { assignedTutor: tutor._id },
-      { $set: { assignedTutor: null } }
-    );
+    // const studentUpdateResult = await Student.updateMany(
+    //   { assignedTutor: tutor._id },
+    //   { $set: { assignedTutor: "null" } }
+    // );
     console.log(`Updated ${studentUpdateResult.modifiedCount} students to remove tutor reference`);
 
     // Delete the tutor
-    await tutor.deleteOne();
+    // await tutor.deleteOne();
     
     res.json({ 
       message: 'Tutor removed successfully',
