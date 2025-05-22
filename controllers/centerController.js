@@ -167,6 +167,8 @@ export const deleteCenter = async (req, res) => {
       return res.status(404).json({ message: 'Center not found' });
     }
 
+    if(center.status === 'inactive') {
+
     // Delete all images from Cloudinary
     if (center.images && center.images.length > 0) {
       await Promise.all(
@@ -196,6 +198,11 @@ export const deleteCenter = async (req, res) => {
       studentsDeleted: deletedStudentsResult.deletedCount,
       tutorsUpdated: tutorsUpdated.modifiedCount
     });
+  } else {
+    center.status = 'inactive';
+    await center.save();
+    res.json({ message: 'Center marked as inactive' });
+  }
   } catch (error) {
     console.error('Error deleting center:', error);
     res.status(500).json({ message: error.message });

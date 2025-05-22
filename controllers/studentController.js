@@ -194,12 +194,17 @@ export const deleteStudent = async (req, res) => {
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
-
+    if(student.status === 'inactive') { 
     // Remove student from center's students array
     await Center.findByIdAndUpdate(student.assignedCenter, { $pull: { students: student._id } });
 
     await student.deleteOne();
     res.json({ message: 'Student removed' });
+    } else {
+      student.status = 'inactive';
+      await student.save();
+      res.json({ message: 'Student status updated to inactive' });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
