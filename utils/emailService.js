@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
  * @param {string} options.month - Month of payment
  * @param {number} options.year - Year of payment
  */
-export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year }) => {
+export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year, amountPaid }) => {
   console.log(`Attempting to send email to: ${to} for ${tutorName}`);
   console.log('Email service config:', {
     service: 'gmail',
@@ -27,7 +27,7 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year }) => 
   
   try {
     const mailOptions = {
-      from: `"Admin" <${process.env.EMAIL_USER}>`,
+      from: `"MTC" <${process.env.EMAIL_USER}>`,
       to,
       subject: `Hadiya Payment Initiated - ${month} ${year}`,
       html: `
@@ -40,9 +40,16 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year }) => 
             <p>We have initiated your Hadiya payment for <strong>${month} ${year}</strong>.</p>
             
             <div style="margin: 25px 0; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
-              <p style="margin: 5px 0;"><strong>Payment Details:</strong></p>
-              <p style="margin: 5px 0;">• For: ${month} ${year}</p>
-              <p style="margin: 5px 0;">• Payment Date: ${new Date().toLocaleDateString('en-IN')}</p>
+              <p style="margin: 5px 0; font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;">Payment Details:</p>
+              <p style="margin: 5px 0; display: flex; justify-content: space-between;">
+                <span>For:</span> <span>${month} ${year}</span>
+              </p>
+              <p style="margin: 5px 0; display: flex; justify-content: space-between;">
+                <span>Amount:</span> <span>₹${amountPaid.toFixed(2)}</span>
+              </p>
+              <p style="margin: 5px 0; display: flex; justify-content: space-between;">
+                <span>Payment Date:</span> <span>${new Date().toLocaleDateString('en-IN')}</span>
+              </p>
             </div>
             
             <p>Please allow <strong>2-8 working days</strong> for the amount to be credited to your account.</p>
@@ -62,6 +69,7 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year }) => 
         
         Payment Details:
         • For: ${month} ${year}
+        • Amount: ₹${amountPaid.toFixed(2)}
         • Payment Date: ${new Date().toLocaleDateString('en-IN')}
         
         Please allow 2-8 working days for the amount to be credited to your account.
@@ -77,13 +85,14 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year }) => 
     console.log(`Payment notification email sent to ${to}`);
     return { success: true };
   } catch (error) {
-    console.error('Error sending payment notification email:', {
+    console.log('Error sending payment notification email:', {
       error: error.message,
       stack: error.stack,
       to,
       tutorName,
       month,
       year,
+      amountPaid,
       time: new Date().toISOString()
     });
     throw new Error(`Failed to send payment notification email: ${error.message}`);

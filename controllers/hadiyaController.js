@@ -2,7 +2,7 @@ import Tutor from '../models/Tutor.js';
 import Admin from '../models/Admin.js'; // For admin reference
 import Center from '../models/Center.js'; // For filtering by center
 import mongoose from 'mongoose';
-import { sendHadiyaPaymentEmail } from '../utils/emailService.js'; // Import email service
+import { sendHadiyaPaymentEmail } from '../utils/emailService'; // Import email service
 
 // @desc    Record a Hadiya payment for a tutor
 // @route   POST /api/hadiya/record
@@ -66,7 +66,8 @@ export const recordHadiyaPayment = async (req, res) => {
           to: tutorWithEmail.email,
           tutorName: tutorWithEmail.name,
           month: monthName,
-          year: parseInt(year, 10)
+          year: parseInt(year, 10),
+          amountPaid: parseFloat(amountPaid)
         }).catch(emailError => {
           console.error('Background email error:', emailError);
           // Don't fail the request if email fails
