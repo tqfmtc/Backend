@@ -1,7 +1,8 @@
 import Tutor from '../models/Tutor.js';
-import Admin from '../models/Admin.js'; // Assuming you have an Admin model to reference paidBy
+import Admin from '../models/Admin.js'; // For admin reference
 import Center from '../models/Center.js'; // For filtering by center
 import mongoose from 'mongoose';
+import { sendHadiyaPaymentEmail } from '../utils/emailService'; // Import email service
 
 // @desc    Record a Hadiya payment for a tutor
 // @route   POST /api/hadiya/record
@@ -53,7 +54,33 @@ export const recordHadiyaPayment = async (req, res) => {
     }
 
     await tutor.save();
-    res.status(201).json({ message: 'Hadiya payment recorded successfully', hadiyaRecord: paymentRecord });
+    
+    // Send email notification in the background (don't await to avoid blocking)
+    try {
+      const tutorWithEmail = await Tutor.findById(tutorId).select('email name');
+      if (tutorWithEmail && tutorWithEmail.email) {
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthName = monthNames[parseInt(month, 10) - 1];
+        
+        sendHadiyaPaymentEmail({
+          to: tutorWithEmail.email,
+          tutorName: tutorWithEmail.name,
+          month: monthName,
+          year: parseInt(year, 10)
+        }).catch(emailError => {
+          console.error('Background email error:', emailError);
+          // Don't fail the request if email fails
+        });
+      }
+    } catch (emailError) {
+      console.error('Error in email notification:', emailError);
+      // Don't fail the request if email fails
+    }
+    
+    res.status(201).json({ 
+      message: 'Hadiya payment recorded successfully', 
+      hadiyaRecord: paymentRecord 
+    });
 
   } catch (error) {
     console.error('Error recording Hadiya payment:', error);
