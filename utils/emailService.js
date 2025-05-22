@@ -18,6 +18,13 @@ const transporter = nodemailer.createTransport({
  * @param {number} options.year - Year of payment
  */
 export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year }) => {
+  console.log(`Attempting to send email to: ${to} for ${tutorName}`);
+  console.log('Email service config:', {
+    service: 'gmail',
+    user: process.env.EMAIL_USER ? 'Set' : 'Not set',
+    hasPassword: process.env.EMAIL_PASS ? 'Yes' : 'No'
+  });
+  
   try {
     const mailOptions = {
       from: `"Admin" <${process.env.EMAIL_USER}>`,
@@ -70,8 +77,16 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year }) => 
     console.log(`Payment notification email sent to ${to}`);
     return { success: true };
   } catch (error) {
-    console.error('Error sending payment notification email:', error);
-    throw new Error('Failed to send payment notification email');
+    console.error('Error sending payment notification email:', {
+      error: error.message,
+      stack: error.stack,
+      to,
+      tutorName,
+      month,
+      year,
+      time: new Date().toISOString()
+    });
+    throw new Error(`Failed to send payment notification email: ${error.message}`);
   }
 };
 
