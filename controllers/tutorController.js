@@ -288,8 +288,17 @@ export const deleteTutor = async (req, res) => {
       center.tutors = center.tutors.filter(id => id.toString() !== tutor._id.toString());
       await center.save();
     }
-    tutor.status = 'inactive';
-    await tutor.save();
+    if(tutor.status === 'inactive') {
+      await tutor.deleteOne();
+      return res.json({ message: 'Tutor permanently deleted' });
+    }
+    else{
+          tutor.status = 'inactive';
+      await tutor.save();
+       return res.json({ message: 'Tutor set to inactive' });
+
+    }
+
 
     // Important: Update all students to clear the assignedTutor field
     // This keeps the students but removes the reference to the deleted tutor

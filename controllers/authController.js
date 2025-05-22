@@ -88,6 +88,11 @@ export const tutorLogin = async (req, res) => {
 
     console.log(`DEBUG: Tutor found: ${tutor.name} (ID: ${tutor._id})`);
     
+    if(tutor.status === 'inactive') {
+      console.log(`DEBUG: Tutor account is inactive: ${tutor.name}`);
+      return res.status(401).json({ message: 'Account is inactive. Please contact admin.' });
+    }
+
     // Check if password exists
     if (!tutor.password) {
       console.log('DEBUG: Tutor has no password set');
