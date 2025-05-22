@@ -2,7 +2,7 @@ import Tutor from '../models/Tutor.js';
 import Admin from '../models/Admin.js'; // For admin reference
 import Center from '../models/Center.js'; // For filtering by center
 import mongoose from 'mongoose';
-import { sendHadiyaPaymentEmail } from '../utils/emailService'; // Import email service
+import { sendHadiyaPaymentEmail } from '../utils/emailService.js'; // Import email service
 
 // @desc    Record a Hadiya payment for a tutor
 // @route   POST /api/hadiya/record
