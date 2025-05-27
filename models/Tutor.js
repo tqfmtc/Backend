@@ -63,8 +63,8 @@ const tutorSchema = mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'pending'],
-      default: 'pending'
+      enum: ['active', 'inactive'],
+      default: 'active'
     },
     
     // Hadiya Information - from AddTutorForm
@@ -148,22 +148,24 @@ const tutorSchema = mongoose.Schema(
 tutorSchema.index({ 'attendance.location': '2dsphere' });
 
 // Hash password before saving
+// We handle password hashing in the controller now
 tutorSchema.pre('save', async function(next) {
+  // Skip password validation if password hasn't been modified
   if (!this.isModified('password')) {
     return next();
   }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
-// Validate password length when creating a new tutor
-tutorSchema.pre('save', function(next) {
-  if (this.isNew && this.password && this.password.length < 6) {
-    next(new Error('Password must be at least 6 characters long'));
-  } else {
-    next();
+  
+  // If this is a new document, ensure password exists
+  if (this.isNew && !this.password) {
+    next(new Error('Password is required'));
   }
+  
+  // Verify the password is already hashed (it should be hashed in the controller)
+  if (!this.password.startsWith('$2')) {
+    next(new Error('Password must be hashed before saving'));
+  }
+  
+  next();
 });
 
 // Match password method
