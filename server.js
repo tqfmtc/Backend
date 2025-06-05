@@ -30,6 +30,7 @@ app.use(morgan('dev'));
 app.use('/api', apiRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/supervisor',supervisorRoutes);
 app.use('/api/hadiya', hadiyaRoutes); // Added
 
 // Error handler
