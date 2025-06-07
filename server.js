@@ -6,7 +6,8 @@ import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import apiRoutes from './routes/api.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
-import adminRoutes from './routes/adminRoutes.js';
+import adminRoutes from './routes/supervisorRoutes.js';
+import supervisorRoutes from './routes/adminRoutes.js';
 import hadiyaRoutes from './routes/hadiyaRoutes.js'; // Added
 
 
