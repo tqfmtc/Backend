@@ -20,7 +20,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: 'https://muhalla-tuition-center.netlify.app',
+    origin: ['https://muhalla-tuition-center.netlify.app', 'http://localhost:5173'],
     credentials: true
   }));
 app.use(express.json());
