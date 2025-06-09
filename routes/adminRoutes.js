@@ -54,4 +54,6 @@ router.delete('/:id', auth, adminOnly, async (req, res) => {
   }
 });
 
+router.post('')
+
 export default router; 

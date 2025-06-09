@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { validationResult } from 'express-validator';
 import Admin from '../models/Admin.js';
+import Supervisor from '../models/Supervisor.js';
 import Tutor from '../models/Tutor.js';
 import Center from '../models/Center.js';
 
@@ -169,6 +170,52 @@ export const tutorLogin = async (req, res) => {
   }
 };
 
+export const supervisorLogin = async(req,res)=>{
+  try {
+    const { email, password } = req.body;
+
+    // Check for supervisor
+    const supervisor = await Supervisor.findOne({email}).select('+password');
+    if (!supervisor) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    const isBcryptHash = supervisor.password && 
+      (supervisor.password.startsWith('$2a$') || supervisor.password.startsWith('$2b$'));
+    let isMatch = false;
+    // Handle both bcrypt and plain text passwords for backward compatibility
+    if (isBcryptHash) {
+      // Bcrypt comparison
+      isMatch = await bcrypt.compare(password, supervisor.password);
+    } else {
+      // Plain text comparison (for backward compatibility)
+      isMatch = (password === supervisor.password);
+      
+      if (isMatch) {
+        // If plain text password matches, upgrade to bcrypt hash for future logins
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        await Supervisor.updateOne({ _id: supervisor._id }, { password: hashedPassword });
+        console.log(`Supervisor password upgraded to bcrypt hash for ${supervisor.email}`);
+      }
+    }
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    res.json({
+      _id: supervisor._id,
+      name: supervisor.name,
+      email: supervisor.email,
+      role: supervisor.role,
+      token: generateToken(supervisor._id, 'supervisor')
+    });
+  }
+  catch (error) {
+    console.error('DEBUG: Supervisor login error:', error);
+    res.status(500).json({ message: error.message });
+}
+}
+
+
 // Fast password reset endpoint for debugging
 export const forceResetTutorPassword = async (req, res) => {
   const { phone, newPassword } = req.body;
@@ -212,3 +259,29 @@ export const registerAdmin = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const registerSupervisor=async (req,res) =>{
+  try{
+    const { name, email, phone, password, assignedCenters } = req.body;
+    const supervisorExists = await Supervisor.findOne({ email });
+    if (supervisorExists) {
+      return res.status(400).json({ message: 'Supervisor already exists' });
+    }
+    const supervisor = await Supervisor.create({
+      name,
+      email,
+      phone,
+      password,
+      assignedCenters
+    });
+    res.status(201).json({
+      _id: supervisor._id,
+      name: supervisor.name,
+      email: supervisor.email,
+      role: supervisor.role,
+      token: generateToken(supervisor._id, 'supervisor')
+    });
+  } catch (error) {
+    console.error('DEBUG: Supervisor registration error:', error);
+  }
+}

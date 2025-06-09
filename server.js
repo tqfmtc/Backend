@@ -7,6 +7,7 @@ import connectDB from './config/db.js';
 import apiRoutes from './routes/api.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import supervisorRoutes from './routes/supervisorRoutes.js';
 import hadiyaRoutes from './routes/hadiyaRoutes.js'; // Added
 
 
@@ -20,7 +21,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: 'https://muhalla-tuition-center.netlify.app',
+    origin: ['https://muhalla-tuition-center.netlify.app', 'http://localhost:5173'],
     credentials: true
   }));
 app.use(express.json());
@@ -30,6 +31,7 @@ app.use(morgan('dev'));
 app.use('/api', apiRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/supervisor',supervisorRoutes);
 app.use('/api/hadiya', hadiyaRoutes); // Added
 
 // Error handler
