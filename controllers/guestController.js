@@ -116,11 +116,17 @@ export const guestLogin = asyncHandler(async (req, res) => {
 
     const today = new Date();
 
+    // Define start and end of current day for pin date matching
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+
     // Find approved request for the phone whose pin matches and today within date range
     const request = await GuestRequest.findOne({
         status: 'approved',
         'guest.phone': phone,
-        pins: { $elemMatch: { date: { $lte: today, $gte: today }, pin } }
+        pins: { $elemMatch: { date: { $gte: startOfDay, $lte: endOfDay }, pin } }
     });
 
     if (!request) {
