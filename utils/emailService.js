@@ -99,6 +99,45 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year, amoun
   }
 };
 
+/**
+ * Sends an approval email with a login PIN to the requesting tutor
+ * @param {Object} options
+ * @param {string} options.to - Recipient email address
+ * @param {string} options.tutorName - Tutor's name
+ * @param {string} options.guestName - Guest tutor name
+ * @param {string} options.pin - 4-digit login pin
+ * @param {Date}  options.startDate - Leave start date
+ * @param {Date}  options.endDate - Leave end date
+ */
+export const sendGuestApprovalEmail = async ({ to, tutorName, guestName, pin, startDate, endDate }) => {
+  try {
+    const mailOptions = {
+      from: `"MTC" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: 'Guest Tutor Request Approved',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background-color:#4CAF50;color:white;padding:20px;text-align:center;">
+            <h2>Guest Tutor Request Approved</h2>
+          </div>
+          <div style="padding:20px;">
+            <p>Dear ${tutorName},</p>
+            <p>Your request for <strong>${guestName}</strong> has been approved.</p>
+            <p>The login PIN for the guest tutor is:</p>
+            <div style="font-size:32px;font-weight:bold;margin:20px 0;color:#4CAF50;text-align:center;">${pin}</div>
+            <p>This PIN will be valid for all scheduled days between <strong>${new Date(startDate).toLocaleDateString()}</strong> and <strong>${new Date(endDate).toLocaleDateString()}</strong>.</p>
+            <p>Please share this PIN with the guest tutor.</p>
+            <p>Best regards,<br/>Admin</p>
+          </div>
+        </div>`,
+    };
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error sending guest approval email: ', error);
+  }
+};
+
 export default {
   sendHadiyaPaymentEmail,
+  sendGuestApprovalEmail,
 };

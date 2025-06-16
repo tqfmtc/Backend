@@ -20,6 +20,11 @@ const GuestRequestSchema = new mongoose.Schema({
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending',
     },
+    // Array of daily login PINs generated upon approval
+    pins: [{
+        date: { type: Date, required: true },
+        pin: { type: String, required: true }
+    }],
     createdAt: {
         type: Date,
         default: Date.now,
