@@ -29,12 +29,12 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 // Mount API routes
-app.use('/api', apiRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/supervisor',supervisorRoutes);
 app.use('/api/hadiya', hadiyaRoutes); // Added
 app.use('/api/guest', guestRoutes);
+app.use('/api', apiRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {
