@@ -77,7 +77,9 @@ export const approveGuestRequest = asyncHandler(async (req, res) => {
     const dayMillis = 24 * 60 * 60 * 1000;
     const pinsArr = [];
     for (let d = new Date(start); d <= end; d = new Date(d.getTime() + dayMillis)) {
-        pinsArr.push({ date: new Date(d), pin });
+        const dateOnly = new Date(d);
+        dateOnly.setHours(0,0,0,0); // normalize to start of day UTC/Server TZ
+        pinsArr.push({ date: dateOnly, pin });
     }
 
     request.pins = pinsArr;

@@ -109,6 +109,17 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year, amoun
  * @param {Date}  options.startDate - Leave start date
  * @param {Date}  options.endDate - Leave end date
  */
+// Helper to format a date in IST so that day/month isn't shifted when server is in UTC
+const formatDateIST = (d) => {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  });
+};
+
 export const sendGuestApprovalEmail = async ({ to, tutorName, guestName, pin, startDate, endDate }) => {
   try {
     const mailOptions = {
@@ -125,7 +136,7 @@ export const sendGuestApprovalEmail = async ({ to, tutorName, guestName, pin, st
             <p>Your request for <strong>${guestName}</strong> has been approved.</p>
             <p>The login PIN for the guest tutor is:</p>
             <div style="font-size:32px;font-weight:bold;margin:20px 0;color:#4CAF50;text-align:center;">${pin}</div>
-            <p>This PIN will be valid for all scheduled days between <strong>${new Date(startDate).toLocaleDateString()}</strong> and <strong>${new Date(endDate).toLocaleDateString()}</strong>.</p>
+            <p>This PIN will be valid for all scheduled days between <strong>${formatDateIST(startDate)}</strong> and <strong>${formatDateIST(endDate)}</strong>.</p>
             <p>Please share this PIN with the guest tutor.</p>
             <p>Best regards,<br/>Admin</p>
           </div>
