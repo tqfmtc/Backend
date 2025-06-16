@@ -21,7 +21,7 @@ export const auth = async (req, res, next) => {
       user = { _id: decoded.id };
       // Expose the associated tutor for downstream handlers (attendance etc.)
       req.tutorId = decoded.tutorId;
-    }else if (decoded.role === 'supervisor') {
+    } else if (decoded.role === 'supervisor') {
       user = await Supervisor.findById(decoded.id).select('-password');
     }
 
@@ -49,10 +49,11 @@ export const adminOnly = (req, res, next) => {
 };
 
 export const supervisorAndAdminOnly = (req, res, next) => {
-  if (req.role !== 'supervisor'|| req.role !== 'admin') {
+  if (req.role !== 'supervisor' && req.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Supervisor or Admin only.' });
   }
-}
+  next();
+};
 
 export const tutorOnly = (req, res, next) => {
   if (req.role !== 'tutor') {
