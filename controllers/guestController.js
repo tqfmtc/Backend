@@ -195,6 +195,12 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        // Check if attendance already marked for today
+        const existingAttendance = await Attendance.findOne({ tutor: tutor._id, date: today });
+        if (existingAttendance) {
+            return res.status(409).json({ message: 'Attendance already marked for today' });
+        }
+
         // Create Attendance document
         await Attendance.create({
             tutor: tutor._id,
@@ -212,6 +218,7 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
             status: 'present',
             center: center._id,
             centerName: center.name,
+            location: { type: 'Point', coordinates: [guestLon, guestLat] },
             markedBy: guestRequestId
         };
         if (existingIndex === -1) {
