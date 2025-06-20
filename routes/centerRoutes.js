@@ -1,7 +1,7 @@
 import express from 'express';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
-import { protect, adminOnly } from '../middleware/auth.js';
+import { protect, adminOnly, supervisorOnly, auth } from '../middleware/auth.js';
 import multer from 'multer';
 import {
   getCenters,
@@ -72,6 +72,11 @@ router.route('/:id')
 router.post('/check-location', protect, locationCheckValidation, validateRequest, checkTutorLocation);
 
 router.get('/:centerId/nearby-tutors', getNearbyTutors);
+
+router.post('/comment/:id',auth,supervisorOnly, getCenter,(req, res) => {
+  
+  res.status(501).json({ message: 'Comment feature not implemented yet' });
+});
 
 // Report routes
 // router.get('/:id/statistics', protect, getCenterStatistics);
