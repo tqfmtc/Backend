@@ -77,8 +77,7 @@ export const approveGuestRequest = asyncHandler(async (req, res) => {
     const dayMillis = 24 * 60 * 60 * 1000;
     const pinsArr = [];
     for (let d = new Date(start); d <= end; d = new Date(d.getTime() + dayMillis)) {
-        const dateOnly = new Date(d);
-        dateOnly.setHours(0,0,0,0); // normalize to start of day UTC/Server TZ
+        const dateOnly = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); // Midnight UTC for the specific calendar date
         pinsArr.push({ date: dateOnly, pin });
     }
 
@@ -118,11 +117,9 @@ export const guestLogin = asyncHandler(async (req, res) => {
 
     const today = new Date();
 
-    // Define start and end of current day for pin date matching
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Define start and end of current day (UTC) for pin date matching
+    const startOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const endOfDay = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999));
 
     // Find approved request for the phone whose pin matches and today within date range
     const request = await GuestRequest.findOne({
