@@ -12,6 +12,12 @@ const centerCommentSchema = new mongoose.Schema({
     ref: 'Supervisor',
     required: true
   },
+  rating:{
+    type: Number,
+    required: true,
+    min: 1,
+    max: 5
+  },
   text: {
     type: String,
     required: true
@@ -23,3 +29,5 @@ const centerCommentSchema = new mongoose.Schema({
 });
 
 const CenterComment = mongoose.model('CenterComment', centerCommentSchema);
+
+export default CenterComment;
