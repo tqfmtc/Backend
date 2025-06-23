@@ -1,7 +1,7 @@
 import express from 'express';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
-import {adminOnly, supervisorOnly} from '../middleware/auth.js';
+import {adminOnly, auth} from '../middleware/auth.js';
 import {
   adminLogin,
   tutorLogin,
@@ -47,10 +47,10 @@ const supervisorRegisterValidation = [
 ];
 
 router.post('/admin/login', adminLoginValidation, validateRequest, adminLogin);
-router.post('/admin/register',adminOnly, adminRegisterValidation, validateRequest, registerAdmin);
+router.post('/admin/register',auth,adminOnly, adminRegisterValidation, validateRequest, registerAdmin);
 router.post('/tutor/login', tutorLoginValidation, validateRequest, tutorLogin);
 router.post('/supervisor/login', supervisorLoginValidation,validateRequest, supervisorLogin)
-router.post('/supervisor/register',adminOnly,supervisorRegisterValidation,validateRequest, registerSupervisor)
+router.post('/supervisor/register',auth,adminOnly,supervisorRegisterValidation,validateRequest, registerSupervisor)
 
 // Fast password reset endpoint for debugging
 router.post('/force-reset-tutor-password', forceResetTutorPassword);
