@@ -467,7 +467,7 @@ export const submitAttendance = async (req, res) => {
       tutorLon,
       centerLat,
       centerLon,
-      1300
+      100
     );
 
     if (!isWithinRange) {

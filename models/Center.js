@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 const centerSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please add a center name']
+    required: [true, 'Please add a center name'],
+    unique: true,
   },
   status: { 
     type: String,
