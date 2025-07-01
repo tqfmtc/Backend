@@ -2,7 +2,7 @@ import express from 'express';
 const router = express.Router();
 import { protect } from '../middleware/auth.js';
 import { adminOnly, tutorOnly, guestOnly } from '../middleware/auth.js';
-import { submitGuestRequest, getMyGuestRequests, getPendingGuestRequests, approveGuestRequest, guestLogin, submitGuestAttendance } from '../controllers/guestController.js';
+import { submitGuestRequest, getMyGuestRequests, getPendingGuestRequests, getGuestRequests, approveGuestRequest, guestLogin, submitGuestAttendance } from '../controllers/guestController.js';
 
 // @desc    Submit a guest tutor request
 // @route   POST /api/guest/request
@@ -20,6 +20,11 @@ router.get('/my-requests', protect, tutorOnly, getMyGuestRequests);
 // @route   GET /api/guest/pending
 // @access  Private (Admin)
 router.get('/pending', protect, adminOnly, getPendingGuestRequests);
+
+// @desc    Get guest tutor requests (all or filtered)
+// @route   GET /api/guest/requests
+// @access  Private (Admin)
+router.get('/requests', protect, adminOnly, getGuestRequests);
 
 // @desc    Approve a guest tutor request
 // @route   POST /api/guest/approve/:id
