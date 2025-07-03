@@ -83,13 +83,33 @@ export const  markAttendance = async (req, res) => {
 };
 
 
-// export const todayAttendance=async(req,res)=>{
-//   try{
-//     if(req.role=='admin'){
-//       const today = await Attendance.find({})
-//     }
-//   }
-// }
+export const todayAttendance=async(req,res)=>{
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  try{
+    if(req.role=='admin'){
+      const today = await Attendance.find({
+        createdAt: {
+          $gte: startOfToday,
+          $lte: endOfToday
+        },
+      }).sort({ createdAt: -1 })
+        .limit(20)
+        .populate('tutor', 'name')
+        .populate('center', 'name');
+      return res.json(today);
+    }
+    else{
+      return res.json("unauthorized");
+    }
+  }
+  catch(err){
+    console.error('Error fetching today\'s attendance:', err);
+    res.status(500).json({ message: 'Failed to fetch today\'s attendance', error: err.message }); 
+}
+}
 // Get attendance report for a specific month
 // Get recent attendance records (latest 20)
 export const getRecentAttendance = async (req, res) => {
