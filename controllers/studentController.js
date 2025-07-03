@@ -9,7 +9,12 @@ export const getStudents = async (req, res) => {
   try {
     // No need to filter by tutor anymore since students are only linked to centers
     // All tutors assigned to a center can view all students from that center
-    let query = {};
+    // Determine status filter: 'active' by default, 'inactive' or 'all' from query
+const statusFilter = req.query.status || 'active';
+let query = {};
+if (statusFilter !== 'all') {
+  query.status = statusFilter;
+}
     
     // If tutor is requesting, only show students from their center
     if (req.role === 'tutor') {
@@ -33,7 +38,7 @@ export const getStudents = async (req, res) => {
 // @access  Private/Admin & Private/Tutor from same center
 export const getStudent = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id)
+    const student = await Student.findOne({ _id: req.params.id, status: 'active' })
       .populate('assignedCenter', 'name location');
     
     if (!student) {
@@ -109,7 +114,8 @@ export const createStudent = async (req, res) => {
       aadharNumber,
       assignedCenter,
       remarks,
-      attendance: [] // Initialize empty attendance array
+      attendance: [], // Initialize empty attendance array
+      status: 'active' // Always set status to active on creation
     };
 
     console.log('Creating student with data:', studentData); // Debug log
@@ -170,6 +176,11 @@ export const updateStudent = async (req, res) => {
       }
       newCenter.students.push(student._id);
       await newCenter.save();
+    }
+
+    // If student is inactive, make them active on any edit
+    if (student.status === 'inactive') {
+      req.body.status = 'active';
     }
 
     const updatedStudent = await Student.findByIdAndUpdate(
@@ -308,7 +319,7 @@ export const getMonthlyAttendanceReport = async (req, res) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    const students = await Student.find()
+    const students = await Student.find({ status: 'active' })
       .populate('assignedCenter', 'name')
       .populate('assignedTutor', 'name');
 
@@ -347,7 +358,7 @@ export const getMonthlyAttendanceReport = async (req, res) => {
 // @access  Private/Admin & Private/Tutor from same center
 export const getStudentProgress = async (req, res) => {
   try {
-    const student = await Student.findById(req.params.id)
+    const student = await Student.findOne({ _id: req.params.id, status: 'active' })
       .populate('assignedCenter', 'name');
 
     if (!student) {

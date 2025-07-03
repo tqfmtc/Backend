@@ -18,7 +18,11 @@ export const getCenters = async (req, res) => {
   try {
     const centers = await Center.find()
       .populate('tutors', 'name phone')
-      .populate('students', 'name');
+      .populate({
+        path: 'students',
+        match: { status: 'active' }, // Only populate active students
+        select: 'name'
+      });
     res.json(centers);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -32,7 +36,11 @@ export const getCenter = async (req, res) => {
   try {
     const center = await Center.findById(req.params.id)
       .populate('tutors', 'name phone')
-      .populate('students', 'name');
+      .populate({
+        path: 'students',
+        match: { status: 'active' }, // Only populate active students
+        select: 'name'
+      });
     
     if (!center) {
       return res.status(404).json({ message: 'Center not found' });
