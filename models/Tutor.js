@@ -23,6 +23,12 @@ const tutorSchema = mongoose.Schema(
       required: true,
       unique: true
     },
+    address: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 200
+    },
     password: {
       type: String,
       required: function() { return this.isNew; },

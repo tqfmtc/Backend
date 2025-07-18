@@ -53,7 +53,7 @@ export const getTutor = async (req, res) => {
 export const createTutor = async (req, res) => {
   try {
     const {
-      name, email, phone, password, qualifications, assignedCenter, subjects,
+      name, email, phone, password, address, qualifications, assignedCenter, subjects,
       sessionType, sessionTiming, assignedHadiyaAmount, aadharNumber,
       bankName, accountNumber, bankBranch, ifscCode
     } = req.body;
@@ -73,8 +73,8 @@ export const createTutor = async (req, res) => {
     if (tutorExists) return res.status(400).json({ message: 'Tutor already exists' });
     
     // Validate password
-    if (!password || password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    if (!password || password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
     
     console.log(`Creating tutor with phone: ${phone}`);
@@ -108,6 +108,7 @@ export const createTutor = async (req, res) => {
       email,
       phone,
       password: hashedPassword,
+      address,
       qualifications: qualifications || '',
       
       // Center & Subject Information
@@ -167,6 +168,7 @@ export const updateTutor = async (req, res) => {
     if (req.body.name) updateData.name = req.body.name;
     if (req.body.email) updateData.email = req.body.email;
     if (req.body.phone) updateData.phone = req.body.phone;
+    if (req.body.address) updateData.address = req.body.address;
     if (req.body.assignedCenter) updateData.assignedCenter = req.body.assignedCenter;
     if (req.body.subjects) updateData.subjects = req.body.subjects;
     if (req.body.sessionType) updateData.sessionType = req.body.sessionType;
