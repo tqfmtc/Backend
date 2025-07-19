@@ -46,7 +46,13 @@ const supervisorRegisterValidation = [
   body('assignedCenters').isArray().withMessage('Assigned centers must be an array')
 ];
 
-router.post('/admin/login', adminLoginValidation, validateRequest, adminLogin);
+// Debug middleware for /admin/login
+const debugAdminLogin = (req, res, next) => {
+  console.log('DEBUG /admin/login req.body:', req.body);
+  next();
+};
+
+router.post('/admin/login', debugAdminLogin, adminLoginValidation, validateRequest, adminLogin);
 router.post('/admin/register',auth,adminOnly, adminRegisterValidation, validateRequest, registerAdmin);
 router.post('/tutor/login', tutorLoginValidation, validateRequest, tutorLogin);
 router.post('/supervisor/login', supervisorLoginValidation,validateRequest, supervisorLogin)
