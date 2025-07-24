@@ -11,6 +11,7 @@ import supervisorRoutes from './routes/supervisorRoutes.js';
 import hadiyaRoutes from './routes/hadiyaRoutes.js'; // Added
 import guestRoutes from './routes/guestRoutes.js';
 import announcementRoutes from './routes/announcementRoutes.js';
+import nativeRoutes from './routes/native.js';
 
 
 // Load env vars
@@ -36,6 +37,7 @@ app.use('/api/supervisor',supervisorRoutes);
 app.use('/api/hadiya', hadiyaRoutes); // Added
 app.use('/api/guest', guestRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/native',nativeRoutes)
 app.use('/api', apiRoutes);
 
 // Error handler
@@ -47,7 +49,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = 3000;
+const PORT = 5000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
