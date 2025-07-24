@@ -13,5 +13,4 @@ export const versionCheck = (req, res) => {
             updateRequired: true
         });
     }
-    res.json({ version: currentVersion });
 }
