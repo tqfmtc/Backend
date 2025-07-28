@@ -537,6 +537,40 @@ export const submitAttendance = async (req, res) => {
   }
 };
 
+// @desc    Get center information for the logged-in tutor
+// @route   GET /api/tutors/my-center
+// @access  Private/Tutor
+export const getTutorCenter = async (req, res) => {
+  try {
+    const tutor = await Tutor.findById(req.user._id)
+      .populate('assignedCenter', 'name location coordinates area sadarName sadarContact');
+
+    if (!tutor) {
+      return res.status(404).json({ message: 'Tutor not found' });
+    }
+
+    if (!tutor.assignedCenter) {
+      return res.status(404).json({ message: 'No center assigned to this tutor' });
+    }
+
+    res.json({
+      success: true,
+      center: {
+        _id: tutor.assignedCenter._id,
+        name: tutor.assignedCenter.name,
+        location: tutor.assignedCenter.location,
+        coordinates: tutor.assignedCenter.coordinates,
+        area: tutor.assignedCenter.area,
+        sadarName: tutor.assignedCenter.sadarName,
+        sadarContact: tutor.assignedCenter.sadarContact
+      }
+    });
+  } catch (error) {
+    console.error('Error getting tutor center:', error);
+    res.status(500).json({ message: 'Error getting center information' });
+  }
+};
+
 // @desc    Get center location for a tutor
 // @route   POST /api/tutors/get-center-location
 // @access  Private/Tutor
