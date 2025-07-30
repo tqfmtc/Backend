@@ -13,7 +13,8 @@ import {
   getTutorPerformanceReport,
   getTutorStudentsReport,
   submitAttendance,
-  getCenterLocation
+  getCenterLocation,
+  getTutorCenter
 } from '../controllers/tutorController.js';
 import { uploadTutorDocuments } from '../middleware/uploadMiddleware.js';
 
@@ -131,6 +132,9 @@ router.post('/get-center-location', [
   body('tutorId').isMongoId().withMessage('Invalid tutor ID'),
   validateRequest
 ], getCenterLocation);
+
+// Get logged-in tutor's center information
+router.get('/my-center', getTutorCenter);
 
 // Middleware to ensure subjects is always an array
 const ensureSubjectsArray = (req, res, next) => {
