@@ -184,13 +184,53 @@ router.post('/', adminOnly,
   createTutor
 );
 
+// Email queue monitoring (Admin only)
+router.get('/email-queue-status', adminOnly, async (req, res) => {
+  try {
+    const { getEmailQueueStatus } = await import('../utils/emailQueue.js');
+    const status = getEmailQueueStatus();
+    
+    res.json({
+      success: true,
+      emailQueue: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Email queue status error:', error);
+    res.status(500).json({ 
+      message: 'Failed to get email queue status', 
+      error: error.message 
+    });
+  }
+});
+
+// Clear failed email jobs (Admin only)
+router.post('/clear-failed-emails', adminOnly, async (req, res) => {
+  try {
+    const { clearFailedEmails } = await import('../utils/emailQueue.js');
+    const clearedCount = clearFailedEmails();
+    
+    res.json({
+      success: true,
+      message: `Cleared ${clearedCount} failed email jobs`,
+      clearedCount
+    });
+  } catch (error) {
+    console.error('Clear failed emails error:', error);
+    res.status(500).json({ 
+      message: 'Failed to clear failed emails', 
+      error: error.message 
+    });
+  }
+});
+
 // Test email functionality (for development/testing purposes)
 router.post('/test-attendance-email', adminOnly, [
   body('tutorId').isMongoId().withMessage('Invalid tutor ID'),
   validateRequest
 ], async (req, res) => {
   try {
-    const { sendAttendanceConfirmationEmail } = await import('../utils/emailService.js');
+    const { queueAttendanceEmail } = await import('../utils/emailQueue.js');
     const Tutor = (await import('../models/Tutor.js')).default;
     const tutor = await Tutor.findById(req.body.tutorId).populate('assignedCenter', 'name location');
     
@@ -203,7 +243,7 @@ router.post('/test-attendance-email', adminOnly, [
     }
     
     const currentTime = new Date();
-    await sendAttendanceConfirmationEmail({
+    const emailJobId = queueAttendanceEmail({
       to: tutor.email,
       tutorName: tutor.name,
       date: currentTime,
@@ -214,13 +254,14 @@ router.post('/test-attendance-email', adminOnly, [
     });
     
     res.json({ 
-      message: 'Test attendance confirmation email sent successfully',
+      message: 'Test attendance confirmation email queued successfully',
+      emailJobId,
       sentTo: tutor.email 
     });
   } catch (error) {
     console.error('Test email error:', error);
     res.status(500).json({ 
-      message: 'Failed to send test email', 
+      message: 'Failed to queue test email', 
       error: error.message 
     });
   }
