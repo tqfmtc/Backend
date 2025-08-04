@@ -10,7 +10,7 @@ import {
   supervisorLogin,
   registerSupervisor
 } from '../controllers/authController.js';
-
+import {generatePasswordResetToken,passwordReset} from '../controllers/passwordResetController.js';
 const router = express.Router();
 
 // Admin login validation
@@ -57,8 +57,7 @@ router.post('/admin/register',auth,adminOnly, adminRegisterValidation, validateR
 router.post('/tutor/login', tutorLoginValidation, validateRequest, tutorLogin);
 router.post('/supervisor/login', supervisorLoginValidation,validateRequest, supervisorLogin)
 router.post('/supervisor/register',auth,adminOnly,supervisorRegisterValidation,validateRequest, registerSupervisor)
-
-// Fast password reset endpoint for debugging
-router.post('/force-reset-tutor-password', forceResetTutorPassword);
+router.post('/tutor/password-reset/:token', passwordReset )
+router.post('/tutor/forgot-password', generatePasswordResetToken)
 
 export default router;

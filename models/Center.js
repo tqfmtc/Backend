@@ -57,8 +57,8 @@ const centerSchema = new mongoose.Schema({
   }
 });
 
-// Ensure uniqueness of the coordinates array
-centerSchema.index({ coordinates: 1 }, { unique: true });
+// Index coordinates for geospatial queries
+centerSchema.index({ coordinates: 1 });
 
 const Center = mongoose.model('Center', centerSchema);
 
