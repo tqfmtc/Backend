@@ -3,6 +3,7 @@ import upload from '../multer.js';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { protect, adminOnly } from '../middleware/auth.js';
+import { createActivityLogger } from '../middleware/activityLogger.js';
 import {
   getTutors,
   getTutor,
@@ -108,12 +109,12 @@ router.use(protect);
 // Routes that require admin access
 router.route('/')
   .get(getTutors)
-  .post(adminOnly, upload.fields(tutorUploadFields), tutorValidation, validateRequest, createTutor);
+  .post(adminOnly, createActivityLogger('CREATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), tutorValidation, validateRequest, createTutor);
 
 router.route('/:id')
   .get(getTutor)
-  .put(adminOnly, upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
-  .delete(adminOnly, deleteTutor);
+  .put(adminOnly, createActivityLogger('UPDATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
+  .delete(adminOnly, createActivityLogger('DELETE_TUTOR', 'Tutor'), deleteTutor);
 
 // Report routes
 router.get('/:id/attendance', getTutorAttendanceReport);

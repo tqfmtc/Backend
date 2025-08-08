@@ -5,6 +5,7 @@ import Admin from '../models/Admin.js';
 import Supervisor from '../models/Supervisor.js';
 import Tutor from '../models/Tutor.js';
 import Center from '../models/Center.js';
+import { logAdminActivity } from '../middleware/activityLogger.js';
 
 // Generate JWT Token
 const generateToken = (id, role) => {
@@ -73,79 +74,39 @@ export const adminLogin = async (req, res) => {
 export const tutorLogin = async (req, res) => {
   try {
     const { phone, password } = req.body;
-    console.log('------------------------------------------------------------');
-    console.log(`DEBUG: Login attempt for phone: ${phone}`);
-    console.log(`DEBUG: Password received (first 3 chars): ${password.substring(0, 3)}***`);
-    console.log(`DEBUG: Password length: ${password.length} characters`);
 
     // Find tutor by phone number, explicitly selecting the password field
     const tutor = await Tutor.findOne({ phone }).select('+password')
       .populate('assignedCenter', 'name location coordinates');
 
     if (!tutor) {
-      console.log(`DEBUG: No tutor found with phone: ${phone}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-
-    console.log(`DEBUG: Tutor found: ${tutor.name} (ID: ${tutor._id})`);
     
     if(tutor.status === 'inactive') {
-      console.log(`DEBUG: Tutor account is inactive: ${tutor.name}`);
       return res.status(401).json({ message: 'Account is inactive. Please contact admin.' });
     }
 
     // Check if password exists
     if (!tutor.password) {
-      console.log('DEBUG: Tutor has no password set');
       return res.status(401).json({ message: 'Account setup incomplete. Please contact admin.' });
     }
     
-    console.log(`DEBUG: Password hash in DB: ${tutor.password}`);
-    console.log(`DEBUG: DB password hash length: ${tutor.password.length} characters`);
-    console.log(`DEBUG: Is bcrypt hash? ${tutor.password.startsWith('$2a$') || tutor.password.startsWith('$2b$')}`);
-    
-    // Now attempt bcrypt verification with detailed logging
+    // Verify password
     let isMatch = false;
     
     try {
-      console.log('DEBUG: Attempting bcrypt comparison...');
-      // Let's try to create a test hash just to make sure bcrypt is working
-      const testSalt = await bcrypt.genSalt(10);
-      const testHash = await bcrypt.hash('test123', testSalt);
-      console.log(`DEBUG: Test hash generation: ${testHash ? 'SUCCESS' : 'FAILED'}`);
-      
-      // Verify our test hash works
-      const testVerify = await bcrypt.compare('test123', testHash);
-      console.log(`DEBUG: Test verification: ${testVerify ? 'SUCCESS' : 'FAILED'}`);
-      
-      // Now try the actual login password verification
       isMatch = await bcrypt.compare(password, tutor.password);
-      console.log(`DEBUG: Actual password verification result: ${isMatch ? 'SUCCESS' : 'FAILED'}`);
-      
-      // Try comparing with the default password, just in case
-      const defaultMatch = await bcrypt.compare('***REMOVED***', tutor.password);
-      console.log(`DEBUG: Default password '***REMOVED***' match: ${defaultMatch ? 'YES' : 'NO'}`);
-      
-      // If default password matches but entered password doesn't, suggest using default
-      if (defaultMatch && !isMatch) {
-        console.log(`DEBUG: User should try the default password '***REMOVED***'`);
-      }
-      
     } catch (err) {
-      console.error('DEBUG: Error in bcrypt comparison:', err);
+      console.error('Error in bcrypt comparison:', err);
     }
     
     if (!isMatch) {
-      console.log('DEBUG: Login failed - Invalid credentials');
       return res.status(401).json({ message: 'Invalid credentials' });
     }
     
-    console.log('DEBUG: Password verification SUCCESSFUL');
-    console.log('------------------------------------------------------------');
-    
     // Generate JWT token
     const token = generateToken(tutor._id, 'tutor');
-    console.log('Login successful, token generated');
 
     // Prepare response with tutor and center data
     const response = {
@@ -211,7 +172,7 @@ export const supervisorLogin = async(req,res)=>{
     });
   }
   catch (error) {
-    console.error('DEBUG: Supervisor login error:', error);
+    console.error('Supervisor login error:', error);
     res.status(500).json({ message: error.message });
 }
 }
@@ -230,7 +191,7 @@ export const forceResetTutorPassword = async (req, res) => {
 
 // @desc    Register Admin
 // @route   POST /api/auth/admin/register
-// @access  Public
+// @access  Admin only
 export const registerAdmin = async (req, res) => {
   try {
     const { name, email, phone, password } = req.body;
@@ -249,6 +210,27 @@ export const registerAdmin = async (req, res) => {
       password
     });
 
+    // Log the activity
+    if (req.user) {
+      await logAdminActivity(
+        req.user,
+        'CREATE_ADMIN',
+        'Admin',
+        admin._id,
+        admin.name,
+        {
+          requestBody: req.body,
+          responseData: {
+            _id: admin._id,
+            name: admin.name,
+            email: admin.email,
+            role: admin.role
+          }
+        },
+        req
+      );
+    }
+
     res.status(201).json({
       _id: admin._id,
       name: admin.name,
@@ -261,8 +243,8 @@ export const registerAdmin = async (req, res) => {
   }
 };
 
-export const registerSupervisor=async (req,res) =>{
-  try{
+export const registerSupervisor = async (req, res) => {
+  try {
     const { name, email, phone, password, assignedCenters } = req.body;
     const supervisorExists = await Supervisor.findOne({ email });
     if (supervisorExists) {
@@ -275,6 +257,28 @@ export const registerSupervisor=async (req,res) =>{
       password,
       assignedCenters
     });
+
+    // Log the activity
+    if (req.user) {
+      await logAdminActivity(
+        req.user,
+        'CREATE_SUPERVISOR',
+        'Supervisor',
+        supervisor._id,
+        supervisor.name,
+        {
+          requestBody: req.body,
+          responseData: {
+            _id: supervisor._id,
+            name: supervisor.name,
+            email: supervisor.email,
+            role: supervisor.role
+          }
+        },
+        req
+      );
+    }
+
     res.status(201).json({
       _id: supervisor._id,
       name: supervisor.name,
@@ -283,6 +287,7 @@ export const registerSupervisor=async (req,res) =>{
       token: generateToken(supervisor._id, 'supervisor')
     });
   } catch (error) {
-    console.error('DEBUG: Supervisor registration error:', error);
+    console.error('Supervisor registration error:', error);
+    res.status(500).json({ message: error.message });
   }
-}
+};

@@ -2,6 +2,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { protect, adminOnly, supervisorOnly, auth } from '../middleware/auth.js';
+import { createActivityLogger, logAdminActivity } from '../middleware/activityLogger.js';
 import multer from 'multer';
 import Center from '../models/Center.js';
 import CenterComment from '../models/CenterComment.js';
@@ -65,7 +66,7 @@ const locationCheckValidation = [
 
 router.route('/')
   .get(protect, getCenters)
-  .post(protect, adminOnly, upload.array('images', 5), centerValidation, validateRequest, createCenter);
+  .post(protect, adminOnly, createActivityLogger('CREATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, createCenter);
 
 router.get('/comments',  async (req, res) => {
   console.log('enter center comments');
@@ -85,8 +86,8 @@ router.get('/comments',  async (req, res) => {
 
 router.route('/:id')
   .get(protect, getCenter)
-  .put(protect, adminOnly, upload.array('images', 5), centerValidation, validateRequest, updateCenter)
-  .delete(protect, adminOnly, deleteCenter);
+  .put(protect, adminOnly, createActivityLogger('UPDATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, updateCenter)
+  .delete(protect, adminOnly, createActivityLogger('DELETE_CENTER', 'Center'), deleteCenter);
 
 router.post('/check-location', protect, locationCheckValidation, validateRequest, checkTutorLocation);
 

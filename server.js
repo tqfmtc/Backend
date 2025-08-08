@@ -7,6 +7,7 @@ import connectDB from './config/db.js';
 import apiRoutes from './routes/api.js';
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import adminActivityRoutes from './routes/adminActivityRoutes.js';
 import supervisorRoutes from './routes/supervisorRoutes.js';
 import hadiyaRoutes from './routes/hadiyaRoutes.js'; // Added
 import guestRoutes from './routes/guestRoutes.js';
@@ -33,6 +34,7 @@ app.use(morgan('dev'));
 // Mount API routes
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/activities', adminActivityRoutes);
 app.use('/api/supervisor',supervisorRoutes);
 app.use('/api/hadiya', hadiyaRoutes); // Added
 app.use('/api/guest', guestRoutes);

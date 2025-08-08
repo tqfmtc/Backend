@@ -485,6 +485,13 @@ export const submitAttendance = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Check if it's Sunday (0 is Sunday in JavaScript's getDay())
+    if (today.getDay() === 0) {
+      return res.status(400).json({
+        message: 'Attendance cannot be submitted on Sundays as it is a weekly off day.'
+      });
+    }
+
     const attendanceRecord = {
       date: today,
       status: 'present',
