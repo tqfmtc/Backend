@@ -3,6 +3,7 @@ import Center from '../models/Center.js';
 import Attendance from '../models/Attendance.js';
 import bcrypt from 'bcryptjs';
 import { isWithinRadius, calculateDistance } from '../utils/geoUtils.js';
+import { queueAttendanceEmail } from '../utils/emailQueue.js';
 
 // Helper: get file path or null
 const getFilePath = (files, field) => files[field] && files[field][0] ? files[field][0].path.replace(/\\/g, '/') : null;
@@ -152,7 +153,8 @@ export const createTutor = async (req, res) => {
       email: tutor.email,
       phone: tutor.phone,
       role: tutor.role,
-      assignedCenter: tutor.assignedCenter
+      assignedCenter: tutor.assignedCenter,
+      collegeName: tutor.collegeName
     });
   } catch (error) {
     console.error('Create tutor error:', error);
@@ -212,6 +214,19 @@ export const updateTutor = async (req, res) => {
     
     // Identification Details
     if (req.body.aadharNumber) updateData.aadharNumber = req.body.aadharNumber;
+    if (req.body.collegeName) updateData.collegeName = req.body.collegeName;
+
+    // Update documents
+    updateData.documents = tutor.documents || {};
+    if (req.body.aadharNumber) updateData.documents.aadharNumber = req.body.aadharNumber;
+    if (getFilePath('aadharPhoto')) updateData.documents.aadharPhoto = getFilePath('aadharPhoto');
+    if (!updateData.documents.bankAccount) updateData.documents.bankAccount = {};
+    if (req.body.bankAccountNumber) updateData.documents.bankAccount.accountNumber = req.body.bankAccountNumber;
+    if (req.body.ifscCode) updateData.documents.bankAccount.ifscCode = req.body.ifscCode;
+    if (getFilePath('passbookPhoto')) updateData.documents.bankAccount.passbookPhoto = getFilePath('passbookPhoto');
+    if (getFilePaths('certificates')) updateData.documents.certificates = getFilePaths('certificates');
+    if (getFilePaths('memos')) updateData.documents.memos = getFilePaths('memos');
+    if (getFilePath('resume')) updateData.documents.resume = getFilePath('resume');
 
     // Password update logic
     if (req.body.password) {
@@ -283,6 +298,7 @@ export const updateTutor = async (req, res) => {
     // Add centerName to the response
     const tutorResponse = updatedTutor.toObject();
     tutorResponse.centerName = tutorResponse.assignedCenter?.name || "Unknown Center";
+    tutorResponse.collegeName = tutorResponse.collegeName;
 
     res.json(tutorResponse);
   } catch (error) {
@@ -512,13 +528,6 @@ export const submitAttendance = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Check if it's Sunday (0 is Sunday in JavaScript's getDay())
-    if (today.getDay() === 0) {
-      return res.status(400).json({
-        message: 'Attendance cannot be submitted on Sundays as it is a weekly off day.'
-      });
-    }
-
     const attendanceRecord = {
       date: today,
       status: 'present',
@@ -557,6 +566,23 @@ export const submitAttendance = async (req, res) => {
     }
 
     await tutor.save();
+
+    // Queue attendance confirmation email (non-blocking)
+    if (tutor.email) {
+      const currentTime = new Date();
+      const emailJobId = queueAttendanceEmail({
+        to: tutor.email,
+        tutorName: tutor.name,
+        date: today,
+        time: currentTime,
+        centerName: center.name,
+        location: [tutorLat, tutorLon],
+        address: center.location || 'Address not available'
+      });
+      console.log(`Attendance email queued with ID: ${emailJobId} for ${tutor.email}`);
+    } else {
+      console.log('Tutor email not available, skipping email notification');
+    }
 
     res.status(200).json({
       message: 'Attendance submitted successfully',
