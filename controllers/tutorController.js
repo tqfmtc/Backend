@@ -46,8 +46,7 @@ export const getTutor = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
-// @desc    Create new tutor
+// @desc    Create tutor
 // @route   POST /api/tutors
 // @access  Private/Admin
 export const createTutor = async (req, res) => {
@@ -55,7 +54,10 @@ export const createTutor = async (req, res) => {
     const {
       name, email, phone, password, address, qualifications, assignedCenter, subjects,
       sessionType, sessionTiming, assignedHadiyaAmount, aadharNumber,
-      bankName, accountNumber, bankBranch, ifscCode
+      bankName, accountNumber, bankBranch, ifscCode,
+      // Educational Details
+      qualificationType, qualificationOther, qualificationStatus,
+      yearOfCompletion, madarsahName, collegeName, specialization
     } = req.body;
     
     // Detailed logging for debugging subjects
@@ -111,6 +113,15 @@ export const createTutor = async (req, res) => {
       address,
       qualifications: qualifications || '',
       
+      // Educational Details
+      qualificationType: qualificationType || '',
+      qualificationOther: qualificationOther || '',
+      qualificationStatus: qualificationStatus || '',
+      yearOfCompletion: yearOfCompletion || '',
+      madarsahName: madarsahName || '',
+      collegeName: collegeName || '',
+      specialization: specialization || '',
+      
       // Center & Subject Information
       assignedCenter,
       subjects: subjectsArray,
@@ -131,8 +142,10 @@ export const createTutor = async (req, res) => {
       // Identification details
       aadharNumber: aadharNumber || ''
     });
+
     // Add tutor to center's tutors array
     await Center.findByIdAndUpdate(tutor.assignedCenter, { $addToSet: { tutors: tutor._id } });
+    
     res.status(201).json({
       _id: tutor._id,
       name: tutor.name,
@@ -158,47 +171,52 @@ export const updateTutor = async (req, res) => {
       return;
     }
 
-    // Handle uploaded files
-    const files = req.files || {};
-    const getFilePath = (field) => files[field] && files[field][0] ? files[field][0].path.replace(/\\/g, '/') : null;
-    const getFilePaths = (field) => files[field] ? files[field].map(f => f.path.replace(/\\/g, '/')) : null;
-
     // Prepare update data
     const updateData = {};
+    
+    // Personal Information
     if (req.body.name) updateData.name = req.body.name;
     if (req.body.email) updateData.email = req.body.email;
     if (req.body.phone) updateData.phone = req.body.phone;
     if (req.body.address) updateData.address = req.body.address;
+    if (req.body.qualifications) updateData.qualifications = req.body.qualifications;
+    
+    // Educational Details
+    if (req.body.qualificationType) updateData.qualificationType = req.body.qualificationType;
+    if (req.body.qualificationOther) updateData.qualificationOther = req.body.qualificationOther;
+    if (req.body.qualificationStatus) updateData.qualificationStatus = req.body.qualificationStatus;
+    if (req.body.yearOfCompletion) updateData.yearOfCompletion = req.body.yearOfCompletion;
+    if (req.body.madarsahName) updateData.madarsahName = req.body.madarsahName;
+    if (req.body.collegeName) updateData.collegeName = req.body.collegeName;
+    if (req.body.specialization) updateData.specialization = req.body.specialization;
+    
+    // Center & Subject Information
     if (req.body.assignedCenter) updateData.assignedCenter = req.body.assignedCenter;
-    if (req.body.subjects) updateData.subjects = req.body.subjects;
+    if (req.body.subjects) {
+      // Ensure subjects is always an array
+      updateData.subjects = Array.isArray(req.body.subjects) ? req.body.subjects : [req.body.subjects];
+    }
+    
+    // Session Information
     if (req.body.sessionType) updateData.sessionType = req.body.sessionType;
     if (req.body.sessionTiming) updateData.sessionTiming = req.body.sessionTiming;
-    if (req.body.assignmentInformation) updateData.assignmentInformation = req.body.assignmentInformation;
-    if (req.body.assignedHadiyaAmount) updateData.assignedHadiyaAmount = req.body.assignedHadiyaAmount;
     
-    // Banking information - direct fields (CRITICAL FIX)
+    // Hadiya Information
+    if (req.body.assignedHadiyaAmount !== undefined) updateData.assignedHadiyaAmount = req.body.assignedHadiyaAmount;
+    
+    // Banking Information
     if (req.body.bankName) updateData.bankName = req.body.bankName;
     if (req.body.bankBranch) updateData.bankBranch = req.body.bankBranch;
     if (req.body.accountNumber) updateData.accountNumber = req.body.accountNumber;
     if (req.body.ifscCode) updateData.ifscCode = req.body.ifscCode;
+    
+    // Identification Details
     if (req.body.aadharNumber) updateData.aadharNumber = req.body.aadharNumber;
-
-    // Update documents
-    updateData.documents = tutor.documents || {};
-    if (req.body.aadharNumber) updateData.documents.aadharNumber = req.body.aadharNumber;
-    if (getFilePath('aadharPhoto')) updateData.documents.aadharPhoto = getFilePath('aadharPhoto');
-    if (!updateData.documents.bankAccount) updateData.documents.bankAccount = {};
-    if (req.body.bankAccountNumber) updateData.documents.bankAccount.accountNumber = req.body.bankAccountNumber;
-    if (req.body.ifscCode) updateData.documents.bankAccount.ifscCode = req.body.ifscCode;
-    if (getFilePath('passbookPhoto')) updateData.documents.bankAccount.passbookPhoto = getFilePath('passbookPhoto');
-    if (getFilePaths('certificates')) updateData.documents.certificates = getFilePaths('certificates');
-    if (getFilePaths('memos')) updateData.documents.memos = getFilePaths('memos');
-    if (getFilePath('resume')) updateData.documents.resume = getFilePath('resume');
 
     // Password update logic
     if (req.body.password) {
-      if (req.body.password.length < 6) {
-        res.status(400).json({ message: 'Password must be at least 6 characters long' });
+      if (req.body.password.length < 8) {
+        res.status(400).json({ message: 'Password must be at least 8 characters long' });
         return;
       }
       const salt = await bcrypt.genSalt(10);
@@ -228,28 +246,31 @@ export const updateTutor = async (req, res) => {
     }
 
     // Check if all required information is complete
+    const currentTutorData = { ...tutor.toObject(), ...updateData };
     const isInformationComplete = Boolean(
-      req.body.name &&
-      req.body.email &&
-      req.body.phone &&
-      req.body.assignedCenter &&
-      req.body.subjects &&
-      req.body.sessionType &&
-      req.body.sessionTiming
+      currentTutorData.name &&
+      currentTutorData.email &&
+      currentTutorData.phone &&
+      currentTutorData.address &&
+      currentTutorData.assignedCenter &&
+      currentTutorData.subjects &&
+      currentTutorData.subjects.length > 0 &&
+      currentTutorData.sessionType &&
+      currentTutorData.sessionTiming
     );
 
-    // Update status based on information completeness
+    // Update status based on information completeness (using schema-valid values)
     if (isInformationComplete) {
       updateData.status = 'active';
     } else {
-      updateData.status = 'pending';
+      updateData.status = 'inactive';
     }
 
     // Update the tutor document
     const updatedTutor = await Tutor.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true, runValidators: false, context: 'query' }
+      { new: true, runValidators: true, context: 'query' }
     )
       .select('-password')
       .populate('assignedCenter', 'name location');
@@ -265,11 +286,17 @@ export const updateTutor = async (req, res) => {
 
     res.json(tutorResponse);
   } catch (error) {
+    console.error('Update tutor error:', error);
     if (error.code === 11000) {
       res.status(400).json({ message: 'A tutor with this phone number already exists' });
       return;
     }
-    res.status(500).json({ message: error.message });
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      res.status(400).json({ message: 'Validation failed', errors: validationErrors });
+      return;
+    }
+    res.status(500).json({ message: 'Error updating tutor', error: error.message });
   }
 };
 
