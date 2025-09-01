@@ -48,7 +48,7 @@ const tutorSchema = mongoose.Schema(
     },
     qualificationStatus: {
       type: String,
-      enum: ['','pursuing', 'completed'],
+      enum: ['pursuing', 'completed'],
       default: ''
     },
     yearOfCompletion: {
