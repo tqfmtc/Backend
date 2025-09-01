@@ -528,6 +528,13 @@ export const submitAttendance = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Check if it's Sunday (0 is Sunday in JavaScript's getDay())
+    if (today.getDay() === 0) {
+      return res.status(400).json({
+        message: 'Attendance cannot be submitted on Sundays as it is a weekly off day.'
+      });
+    }
+
     const attendanceRecord = {
       date: today,
       status: 'present',
@@ -566,23 +573,6 @@ export const submitAttendance = async (req, res) => {
     }
 
     await tutor.save();
-
-    // Queue attendance confirmation email (non-blocking)
-    if (tutor.email) {
-      const currentTime = new Date();
-      const emailJobId = queueAttendanceEmail({
-        to: tutor.email,
-        tutorName: tutor.name,
-        date: today,
-        time: currentTime,
-        centerName: center.name,
-        location: [tutorLat, tutorLon],
-        address: center.location || 'Address not available'
-      });
-      console.log(`Attendance email queued with ID: ${emailJobId} for ${tutor.email}`);
-    } else {
-      console.log('Tutor email not available, skipping email notification');
-    }
 
     res.status(200).json({
       message: 'Attendance submitted successfully',
