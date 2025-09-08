@@ -201,7 +201,7 @@ export const getAttendanceReport = async (req, res) => {
     // Get all tutors for the selected center (or all centers), filtering by active status
     const tutorQuery = centerId ? { assignedCenter: centerId, status: { $in: ['active', 'pending'] } } : { status: { $in: ['active', 'pending'] } };
     const tutors = await Tutor.find(tutorQuery).populate('assignedCenter', 'name');
-    // console.log(`Found ${tutors.length} tutors for centerId: ${centerId || 'all centers'}`);
+    console.log(`Found ${tutors.length} tutors for centerId: ${centerId || 'all centers'}`);
 
     // Generate all calendar days in the selected month
     const allDaysInMonth = eachDayOfInterval({ start: monthStartDate, end: monthEndDate });

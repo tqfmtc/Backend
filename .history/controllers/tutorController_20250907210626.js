@@ -573,13 +573,9 @@ export const submitAttendance = async (req, res) => {
     }
 
     await tutor.save();
-    if(0){
-      res.status(200).json({
-        message: 'Attendance disabled by Admin'  //⚠️DO NOT CHANGE THIS TEXT - ATTENDANCE APP WILL STOP WORKING
-      })
-    }
+
     res.status(200).json({
-      message: 'Attendance submitted successfully', //⚠️DO NOT CHANGE THIS TEXT - ATTENDANCE APP WILL STOP WORKING
+      message: 'Attendance submitted successfully', //D
       attendance: attendanceRecord
     });
   } catch (error) {
