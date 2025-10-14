@@ -14,35 +14,6 @@ export const toggleAttendanceButton=async(req,res)=>{
     let button=await AttendanceButton.findOne();
     if(!button){
       button=new AttendanceButton({status:status,lastChangedBy:req.user._id});
-    }
-    else{
-      button.status=status;
-      button.lastChangedBy=req.user._id;
-      button.lastChangedAt=new Date();
-    }
-    await button.save();
-    res.status(200).json({message:"Attendance button status updated",button});
-  }
-  catch(err){
-    console.error('Error toggling attendance button:', err);
-    res.status(500).json({message:"Error toggling attendance button",errorDetails:err.message});
-  }
-}
-
-//get status of attendance button
-export const buttonStatus=async(req,res)=>{
-  try{
-    let button=await AttendanceButton.findOne();
-    if(!button){
-      return res.status(200).json({status:false,message:"Button not set, defaulting to false"});
-    }
-    res.status(200).json({status:button.status});
-  }
-  catch(err){
-    console.error('Error fetching attendance button status:', err);
-    res.status(500).json({message:"Error fetching attendance button status",errorDetails:err.message});
-  }
-}
 
 // Mark attendance for a tutor (by Admin)
 export const  markAttendance = async (req, res) => {
@@ -282,5 +253,78 @@ export const getAttendanceReport = async (req, res) => {
   } catch (error) {
     console.error('Error fetching attendance report:', error);
     res.status(500).json({ message: 'Error fetching attendance report', errorDetails: error.message });
+  }
+};
+
+// Get monthly attendance coordinates for tutors (all or specific tutor)
+// @route GET /api/attendance/tutor-coordinates?month=MM&year=YYYY[&tutorId=...][&centerId=...]
+// @access Private/Admin
+export const getTutorMonthlyCoordinates = async (req, res) => {
+  try {
+    const { month, year, tutorId, centerId } = req.query;
+
+    if (!month || !year) {
+      return res.status(400).json({ message: 'Month and year are required query parameters.' });
+    }
+
+    const numericMonth = parseInt(month, 10);
+    const numericYear = parseInt(year, 10);
+
+    if (isNaN(numericMonth) || isNaN(numericYear) || numericMonth < 1 || numericMonth > 12) {
+      return res.status(400).json({ message: 'Invalid month or year format.' });
+    }
+
+    // Only admins for now
+    if (req.role !== 'admin') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const monthStartDate = startOfMonth(new Date(numericYear, numericMonth - 1, 1));
+    const monthEndDate = endOfMonth(new Date(numericYear, numericMonth - 1, 1));
+
+    const query = { status: { $in: ['active', 'pending'] } };
+    if (centerId) {
+      query.assignedCenter = centerId;
+    }
+    if (tutorId) {
+      query._id = tutorId;
+    }
+
+    const tutors = await Tutor.find(query).populate('assignedCenter', 'name');
+
+    const data = tutors.map(tutor => {
+      const points = [];
+      tutor.attendance.forEach(record => {
+        const recordDate = new Date(record.date);
+        if (recordDate >= monthStartDate && recordDate <= monthEndDate && record.status === 'present' && record.location && Array.isArray(record.location.coordinates)) {
+          const [lng, lat] = record.location.coordinates; // GeoJSON order is [lng, lat]
+          points.push({
+            date: format(recordDate, 'yyyy-MM-dd'),
+            time: format(recordDate, 'HH:mm'),
+            lat,
+            lng,
+            status: record.status
+          });
+        }
+      });
+
+      let centerInfo = { name: 'N/A' };
+      if (tutor.assignedCenter && tutor.assignedCenter.name) {
+        centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
+      }
+
+      return {
+        tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
+        center: centerInfo,
+        month: numericMonth,
+        year: numericYear,
+        points
+      };
+    });
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error fetching tutor monthly coordinates:', error);
+    res.status(500).json({ message: 'Error fetching tutor monthly coordinates', errorDetails: error.message });
   }
 };

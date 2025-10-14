@@ -537,10 +537,7 @@ export const submitAttendance = async (req, res) => {
     }
     const attendanceButton= await AttendanceButton.findOne();
     if(attendanceButton.status === 'disabled'){
-      return res.status(400).json({
-        message: 'Attendance disabled by Admin' //⚠️DO NOT CHANGE THIS TEXT - ATTENDANCE APP WILL STOP WORKING
-      });
-    }
+
     const attendanceRecord = {
       date: today,
       status: 'present',

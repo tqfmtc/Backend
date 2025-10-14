@@ -1,5 +1,5 @@
 import express from 'express';
-import { markAttendance, getAttendanceReport, getRecentAttendance, clearRecentAttendance, todayAttendance, getTutorMonthlyCoordinates,toggleAttendanceButton,buttonStatus } from '../controllers/attendanceController.js';
+import { markAttendance, getAttendanceReport, getRecentAttendance, clearRecentAttendance, todayAttendance, getTutorMonthlyCoordinates,toggleAttendanceButton } from '../controllers/attendanceController.js';
 import { auth, adminOnly } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,10 +8,10 @@ const router = express.Router();
 router.use(auth);
 
 //Disable/Enable attendance button
-router.post('/buttonToggle',adminOnly,toggleAttendanceButton)
+router.post('/toggle',adminOnly,toggleAttendanceButton)
 
 //get button status
-router.get('/buttonStatus',buttonStatus)
+router.get()
 
 // Mark attendance
 router.post('/mark', adminOnly, markAttendance);
@@ -21,6 +21,9 @@ router.get('/recent', getRecentAttendance);
 
 // Get attendance report
 router.get('/report', adminOnly, getAttendanceReport);
+
+// Get tutor monthly coordinates (admin only)
+router.get('/tutor-coordinates', adminOnly, getTutorMonthlyCoordinates);
 
 // Get recent attendance
 router.get('/recent', getRecentAttendance);

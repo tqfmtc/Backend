@@ -541,6 +541,7 @@ export const submitAttendance = async (req, res) => {
         message: 'Attendance disabled by Admin' //⚠️DO NOT CHANGE THIS TEXT - ATTENDANCE APP WILL STOP WORKING
       });
     }
+
     const attendanceRecord = {
       date: today,
       status: 'present',
