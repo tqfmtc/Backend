@@ -1,7 +1,48 @@
 import Attendance from '../models/Attendance.js';
+import AttendanceButton from '../models/AttendanceButton.js';
 import Tutor from '../models/Tutor.js';
 import Center from '../models/Center.js';
 import { startOfMonth, endOfMonth, format, eachDayOfInterval } from 'date-fns';
+
+//Toggle attendance button
+export const toggleAttendanceButton=async(req,res)=>{
+  try{
+    const {status}=req.body;
+    if(typeof status !=='boolean'){
+      return res.status(400).json({message:"Status must be boolean"});
+    }
+    let button=await AttendanceButton.findOne();
+    if(!button){
+      button=new AttendanceButton({status:status,lastChangedBy:req.user._id});
+    }
+    else{
+      button.status=status;
+      button.lastChangedBy=req.user._id;
+      button.lastChangedAt=new Date();
+    }
+    await button.save();
+    res.status(200).json({message:"Attendance button status updated",button});
+  }
+  catch(err){
+    console.error('Error toggling attendance button:', err);
+    res.status(500).json({message:"Error toggling attendance button",errorDetails:err.message});
+  }
+}
+
+//get status of attendance button
+export const buttonStatus=async(req,res)=>{
+  try{
+    let button=await AttendanceButton.findOne();
+    if(!button){
+      return res.status(200).json({status:false,message:"Button not set, defaulting to false"});
+    }
+    res.status(200).json({status:button.status});
+  }
+  catch(err){
+    console.error('Error fetching attendance button status:', err);
+    res.status(500).json({message:"Error fetching attendance button status",errorDetails:err.message});
+  }
+}
 
 // Mark attendance for a tutor (by Admin)
 export const  markAttendance = async (req, res) => {
