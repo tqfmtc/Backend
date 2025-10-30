@@ -10,11 +10,11 @@ export const getStudents = async (req, res) => {
     // No need to filter by tutor anymore since students are only linked to centers
     // All tutors assigned to a center can view all students from that center
     // Determine status filter: 'active' by default, 'inactive' or 'all' from query
-const statusFilter = req.query.status || 'active';
-let query = {};
-if (statusFilter !== 'all') {
-  query.status = statusFilter;
-}
+  const statusFilter = req.query.status || 'active';
+  let query = {};
+  if (statusFilter !== 'all') {
+    query.status = statusFilter;
+  }
     
     // If tutor is requesting, only show students from their center
     if (req.role === 'tutor') {
@@ -99,7 +99,22 @@ export const createStudent = async (req, res) => {
         return res.status(403).json({ message: 'You can only add students to your assigned center' });
       }
     }
+  let assignedTutor;
+  if (req.role === 'tutor') {
+    // If the logged-in user is a tutor, assign themselves as the tutor
+    assignedTutor = req.user._id;
+  } else {
+    // Otherwise, get the tutor ID from the request body
+    assignedTutor = req.body.assignedTutor;
 
+    // Check if the provided tutor exists
+    if (assignedTutor) {
+      const tutor = await Tutor.findById(assignedTutor);
+      if (!tutor) {
+        return res.status(404).json({ message: 'Assigned tutor not found' });
+      }
+    }
+  }
     // Create student with proper data structure
     const studentData = {
       name,
@@ -113,6 +128,7 @@ export const createStudent = async (req, res) => {
       medium,
       aadharNumber,
       assignedCenter,
+      assignedTutor,
       remarks,
       attendance: [], // Initialize empty attendance array
       status: 'active' // Always set status to active on creation
@@ -169,6 +185,15 @@ export const updateStudent = async (req, res) => {
         await oldCenter.save();
       }
 
+      //add assignedTutor
+      if (req.body.assignedTutor) {
+        const tutor = await Tutor.findById(req.body.assignedTutor);
+        if (!tutor) {
+          return res.status(404).json({ message: 'Assigned tutor not found' });
+        }
+        student.assignedTutor = req.body.assignedTutor;
+      }
+
       // Add student to new center
       const newCenter = await Center.findById(req.body.assignedCenter);
       if (!newCenter) {
@@ -190,6 +215,26 @@ export const updateStudent = async (req, res) => {
     );
 
     res.json(updatedStudent);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// change assignedTutor
+export const changeAssignedTutor = async (req, res) => {
+  try {
+    const { studentId, tutorId } = req.body;
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+    const tutor = await Tutor.findById(tutorId);
+    if (!tutor) {
+      return res.status(404).json({ message: 'Tutor not found' });
+    }
+    student.assignedTutor = tutorId;
+    await student.save();
+    res.json({ message: 'Assigned tutor updated successfully', student });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

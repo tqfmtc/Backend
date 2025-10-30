@@ -1,10 +1,10 @@
 import express from 'express';
-import {addStudentSubject, getAllStudentSubjectRecords, deleteStudentSubjectRecord,addMarksToStudentSubject,getStudentSubjectRecord,updateStudentSubjectRecord,getSubjectsByStudent,getStudentsBySubject} from '../controllers/studentSubjectController.js';
+import {createStudentSubjectRecord, getAllStudentSubjectRecords, deleteStudentSubjectRecord,addMarksToStudentSubject,getStudentSubjectRecord,updateStudentSubjectRecord,getSubjectsByStudent,getStudentsBySubject} from '../controllers/studentSubjectController.js';
 import { auth } from '../middleware/auth.js';
 import { createActivityLogger } from '../middleware/activityLogger.js';
 const router = express.Router();
 // POST /api/student-subjects - Add a student-subject record
-router.post('/',auth,addStudentSubject);
+router.post('/',auth,createStudentSubjectRecord);
 // GET /api/student-subjects - Get all student-subject records
 router.get('/',auth,getAllStudentSubjectRecords);
 

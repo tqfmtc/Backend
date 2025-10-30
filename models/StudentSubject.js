@@ -17,6 +17,9 @@ const studentSubjectSchema=new mongoose.Schema({
         max: 100,
         required: true,
       },
+      examDate:{
+        type: Date,
+      },
       recordedAt: {
         type: Date,
         default: Date.now,

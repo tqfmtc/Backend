@@ -56,6 +56,10 @@ const studentSchema = new mongoose.Schema({
     ref: 'Center',
     required: [true, 'Please assign a center']
   },
+  assignedTutor:{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tutor'
+  },
   attendance: [{
     month: {
       type: String,

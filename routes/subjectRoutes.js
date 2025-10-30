@@ -26,3 +26,4 @@ router.put('/:id', auth, adminOnly, createActivityLogger('UPDATE_SUBJECT', 'Stud
 // DELETE /api/subjects/:id - Delete subject (admin only)
 router.delete('/:id', auth, adminOnly, createActivityLogger('DELETE_SUBJECT', 'StudentSubject'), deleteSubject);
 
+export default router;
