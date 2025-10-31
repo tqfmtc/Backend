@@ -25,7 +25,13 @@ export const getStudents = async (req, res) => {
     }
 
     const students = await Student.find(query)
-      .populate('assignedCenter', 'name location');
+      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact').populate({
+    path: 'subjects',                  // populate StudentSubject
+    populate: {                        // nested populate
+      path: 'subject',                 // populate Subject inside StudentSubject
+      select: 'name'                   // only include the name field
+    }
+  });
     
     res.json(students);
   } catch (error) {
@@ -39,7 +45,13 @@ export const getStudents = async (req, res) => {
 export const getStudent = async (req, res) => {
   try {
     const student = await Student.findOne({ _id: req.params.id, status: 'active' })
-      .populate('assignedCenter', 'name location');
+      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact').populate({
+    path: 'subjects',                  // populate StudentSubject
+    populate: {                        // nested populate
+      path: 'subject',                 // populate Subject inside StudentSubject
+      select: 'name'                   // only include the name field
+    }
+  });
     
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });

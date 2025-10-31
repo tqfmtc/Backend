@@ -16,7 +16,11 @@ const getFilePaths = (files, field) => files[field] ? files[field].map(f => f.pa
 export const getTutors = async (req, res) => {
   try {
     const tutors = await Tutor.find()
-      .populate('assignedCenter', 'name location')
+      .populate('assignedCenter', 'name location').populate({
+        path: 'students',
+        match: { status: 'active' }, // Only populate active students
+        select: 'name'
+      })
       .select('-password');
     const tutorsWithCenterName = tutors.map(tutor => {
       const tutorObj = tutor.toObject();
@@ -35,7 +39,11 @@ export const getTutors = async (req, res) => {
 export const getTutor = async (req, res) => {
   try {
     const tutor = await Tutor.findById(req.params.id)
-      .populate('assignedCenter', 'name location')
+      .populate('assignedCenter', 'name location').populate({
+        path: 'students',
+        match: { status: 'active' }, // Only populate active students
+        select: 'name fatherName contact'
+      })
       .select('-password');
     if (!tutor) return res.status(404).json({ message: 'Tutor not found' });
     if (req.role !== 'admin' && req.user._id.toString() !== tutor._id.toString()) {

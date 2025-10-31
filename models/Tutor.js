@@ -77,6 +77,10 @@ const tutorSchema = mongoose.Schema(
       ref: 'Center',
       required: true
     },
+    students: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Student'
+    }],
     subjects: [{
       type: String,
       required: true
