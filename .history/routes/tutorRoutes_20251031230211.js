@@ -55,6 +55,11 @@ const tutorValidation = [
     .withMessage('Invalid session timing'),
   // Make these fields optional as they'll be filled by tutor later
   body('qualifications').optional(),
+  body('qualificationType').optional().isIn(['graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others']).withMessage('Invalid qualification type'),
+  body('qualificationOther').optional().isLength({ max: 50 }).withMessage('Qualification details cannot exceed 50 characters'),
+  body('qualificationStatus').optional().isIn(['pursuing', 'completed']).withMessage('Invalid qualification status'),
+  body('yearOfCompletion').optional().isLength({ min: 4, max: 4 }).withMessage('Year must be 4 digits'),
+  body('madarsahName').optional().isLength({ max: 50 }).withMessage('Madarsah name cannot exceed 50 characters'),
   body('documents.aadharNumber').optional(),
   body('documents.aadharPhoto').optional(),
   body('documents.bankAccount.accountNumber').optional(),
@@ -109,12 +114,12 @@ router.use(protect);
 // Routes that require admin access
 router.route('/')
   .get(getTutors)
-  .post(adminOnly, upload.fields(tutorUploadFields), tutorValidation, validateRequest, createTutor);
+  .post(adminOnly, createActivityLogger('CREATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), tutorValidation, validateRequest, createTutor);
 
 router.route('/:id')
   .get(getTutor)
-  .put(adminOnly, upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
-  .delete(adminOnly, deleteTutor);
+  .put(adminOnly, createActivityLogger('UPDATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
+  .delete(adminOnly, createActivityLogger('DELETE_TUTOR', 'Tutor'), deleteTutor);
 
 // Report routes
 router.get('/:id/attendance', getTutorAttendanceReport);
@@ -160,5 +165,88 @@ router.post('/', protect, adminOnly,
   validateRequest,
   createTutor
 );
+
+// Email queue monitoring (Admin only)
+router.get('/email-queue-status', adminOnly, async (req, res) => {
+  try {
+    const { getEmailQueueStatus } = await import('../utils/emailQueue.js');
+    const status = getEmailQueueStatus();
+    
+    res.json({
+      success: true,
+      emailQueue: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Email queue status error:', error);
+    res.status(500).json({ 
+      message: 'Failed to get email queue status', 
+      error: error.message 
+    });
+  }
+});
+
+// Clear failed email jobs (Admin only)
+router.post('/clear-failed-emails', adminOnly, async (req, res) => {
+  try {
+    const { clearFailedEmails } = await import('../utils/emailQueue.js');
+    const clearedCount = clearFailedEmails();
+    
+    res.json({
+      success: true,
+      message: `Cleared ${clearedCount} failed email jobs`,
+      clearedCount
+    });
+  } catch (error) {
+    console.error('Clear failed emails error:', error);
+    res.status(500).json({ 
+      message: 'Failed to clear failed emails', 
+      error: error.message 
+    });
+  }
+});
+
+// Test email functionality (for development/testing purposes)
+router.post('/test-attendance-email', adminOnly, [
+  body('tutorId').isMongoId().withMessage('Invalid tutor ID'),
+  validateRequest
+], async (req, res) => {
+  try {
+    const { queueAttendanceEmail } = await import('../utils/emailQueue.js');
+    const Tutor = (await import('../models/Tutor.js')).default;
+    const tutor = await Tutor.findById(req.body.tutorId).populate('assignedCenter', 'name location');
+    
+    if (!tutor) {
+      return res.status(404).json({ message: 'Tutor not found' });
+    }
+    
+    if (!tutor.email) {
+      return res.status(400).json({ message: 'Tutor email not available' });
+    }
+    
+    const currentTime = new Date();
+    const emailJobId = queueAttendanceEmail({
+      to: tutor.email,
+      tutorName: tutor.name,
+      date: currentTime,
+      time: currentTime,
+      centerName: tutor.assignedCenter?.name || 'Test Center',
+      location: [28.6139, 77.2090], // Sample Delhi coordinates
+      address: tutor.assignedCenter?.location || 'Test Address, Delhi'
+    });
+    
+    res.json({ 
+      message: 'Test attendance confirmation email queued successfully',
+      emailJobId,
+      sentTo: tutor.email 
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ 
+      message: 'Failed to queue test email', 
+      error: error.message 
+    });
+  }
+});
 
 export default router;

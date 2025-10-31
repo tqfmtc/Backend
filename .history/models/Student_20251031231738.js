@@ -60,10 +60,7 @@ const studentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tutor'
   },
-  subjects: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'StudentSubject'
-  }],
+  subjects:
   attendance: [{
     month: {
       type: String,

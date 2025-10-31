@@ -8,11 +8,7 @@ const tutorSchema = mongoose.Schema(
       type: String,
       required: true
     },
-    status: { 
-    type: String,
-    enum: ['active', 'inactive'],
-    default: 'active'
-  },
+
     email: {
       type: String,
       required: true,
@@ -39,12 +35,52 @@ const tutorSchema = mongoose.Schema(
       default: ''
     },
     
+    // Educational Details - from AddTutorForm
+    qualificationType: {
+      type: String,
+      enum: ['','graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others'],
+      default: ''
+    },
+    qualificationOther: {
+      type: String,
+      default: '',
+      maxlength: 50
+    },
+    qualificationStatus: {
+      type: String,
+      enum: ['','pursuing', 'completed'],
+      default: ''
+    },
+    yearOfCompletion: {
+      type: String,
+      default: ''
+    },
+    madarsahName: {
+      type: String,
+      default: '',
+      maxlength: 50
+    },
+    collegeName: {
+      type: String,
+      default: '',
+      maxlength: 50
+    },
+    specialization: {
+      type: String,
+      default: '',
+      maxlength: 50
+    },
+    
     // Center & Subject Information - from AddTutorForm
     assignedCenter: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Center',
       required: true
     },
+    students: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Student'
+    }],
     subjects: [{
       type: String,
       required: true

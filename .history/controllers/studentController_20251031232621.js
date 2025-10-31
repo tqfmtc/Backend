@@ -25,13 +25,7 @@ export const getStudents = async (req, res) => {
     }
 
     const students = await Student.find(query)
-      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact').populate({
-    path: 'subjects',                  // populate StudentSubject
-    populate: {                        // nested populate
-      path: 'subject',                 // populate Subject inside StudentSubject
-      select: 'name'                   // only include the name field
-    }
-  });
+      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact').populate('subjects', 'name');
     
     res.json(students);
   } catch (error) {

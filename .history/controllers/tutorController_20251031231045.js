@@ -42,7 +42,7 @@ export const getTutor = async (req, res) => {
       .populate('assignedCenter', 'name location').populate({
         path: 'students',
         match: { status: 'active' }, // Only populate active students
-        select: 'name fatherName contact'
+         select: 'name fatherName contact'
       })
       .select('-password');
     if (!tutor) return res.status(404).json({ message: 'Tutor not found' });

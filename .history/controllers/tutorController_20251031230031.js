@@ -20,7 +20,7 @@ export const getTutors = async (req, res) => {
         path: 'students',
         match: { status: 'active' }, // Only populate active students
         select: 'name'
-      })
+      });
       .select('-password');
     const tutorsWithCenterName = tutors.map(tutor => {
       const tutorObj = tutor.toObject();
@@ -39,11 +39,7 @@ export const getTutors = async (req, res) => {
 export const getTutor = async (req, res) => {
   try {
     const tutor = await Tutor.findById(req.params.id)
-      .populate('assignedCenter', 'name location').populate({
-        path: 'students',
-        match: { status: 'active' }, // Only populate active students
-        select: 'name fatherName contact'
-      })
+      .populate('assignedCenter', 'name location')
       .select('-password');
     if (!tutor) return res.status(404).json({ message: 'Tutor not found' });
     if (req.role !== 'admin' && req.user._id.toString() !== tutor._id.toString()) {
