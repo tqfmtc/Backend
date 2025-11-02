@@ -148,7 +148,168 @@ export const sendGuestApprovalEmail = async ({ to, tutorName, guestName, pin, st
   }
 };
 
+/**
+ * Sends an attendance confirmation email to a tutor
+ * @param {Object} options - Email options
+ * @param {string} options.to - Recipient email
+ * @param {string} options.tutorName - Tutor's name
+ * @param {Date} options.date - Attendance date
+ * @param {string} options.time - Attendance time
+ * @param {string} options.centerName - Center name
+ * @param {Array} options.location - [latitude, longitude] of attendance location
+ * @param {string} options.address - Readable address (optional)
+ */
+export const sendAttendanceConfirmationEmail = async ({ 
+  to, 
+  tutorName, 
+  date, 
+  time, 
+  centerName, 
+  location, 
+  address 
+}) => {
+  console.log(`Attempting to send attendance confirmation email to: ${to} for ${tutorName}`);
+  
+  try {
+    const formattedDate = new Date(date).toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const formattedTime = new Date(time).toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    const locationText = location ? `${location[0].toFixed(6)}, ${location[1].toFixed(6)}` : 'Not available';
+    const addressText = address || 'Address not available';
+
+    const mailOptions = {
+      from: `"MTC - Attendance System" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: `Attendance Confirmed - ${formattedDate}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #4CAF50, #45a049); color: white; padding: 25px; text-align: center;">
+            <h2 style="margin: 0; font-size: 24px;">✅ Attendance Confirmed</h2>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Your attendance has been successfully recorded</p>
+          </div>
+          
+          <div style="padding: 30px 25px;">
+            <p style="font-size: 16px; color: #333; margin-bottom: 25px;">Dear <strong>${tutorName}</strong>,</p>
+            
+            <p style="color: #555; line-height: 1.6; margin-bottom: 25px;">
+              Your attendance has been successfully marked and recorded in our system.
+            </p>
+            
+            <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin: 25px 0; border-left: 4px solid #4CAF50;">
+              <h3 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 18px;">📋 Attendance Details</h3>
+              
+              <div style="display: grid; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e9ecef;">
+                  <span style="font-weight: 600; color: #495057;">📅 Date:</span>
+                  <span style="color: #6c757d;">${formattedDate}</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e9ecef;">
+                  <span style="font-weight: 600; color: #495057;">⏰ Time:</span>
+                  <span style="color: #6c757d;">${formattedTime}</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e9ecef;">
+                  <span style="font-weight: 600; color: #495057;">🏫 Center:</span>
+                  <span style="color: #6c757d;">${centerName}</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e9ecef;">
+                  <span style="font-weight: 600; color: #495057;">📍 Location:</span>
+                  <span style="color: #6c757d; font-family: monospace; font-size: 12px;">${locationText}</span>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                  <span style="font-weight: 600; color: #495057;">🗺️ Address:</span>
+                  <span style="color: #6c757d; text-align: right; max-width: 60%;">${addressText}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div style="background-color: #e8f5e8; border-radius: 6px; padding: 15px; margin: 20px 0; border: 1px solid #c3e6c3;">
+              <p style="margin: 0; color: #2d5a2d; font-size: 14px;">
+                <strong>✅ Status:</strong> Your attendance is now recorded in the system and will be reflected in your monthly reports.
+              </p>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; line-height: 1.6; margin-top: 25px;">
+              If you have any questions about your attendance or notice any discrepancies, please contact the administration immediately.
+            </p>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
+              <p style="margin: 0; color: #666; font-size: 14px;">
+                Best regards,<br>
+                <strong>MTC Administration Team</strong>
+              </p>
+            </div>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 15px 25px; text-align: center; border-top: 1px solid #e9ecef;">
+            <p style="margin: 0; color: #6c757d; font-size: 12px;">
+              This is an automated message. Please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      `,
+      text: `
+        Attendance Confirmed - ${formattedDate}
+        
+        Dear ${tutorName},
+        
+        Your attendance has been successfully marked and recorded in our system.
+        
+        Attendance Details:
+        • Date: ${formattedDate}
+        • Time: ${formattedTime}
+        • Center: ${centerName}
+        • Location: ${locationText}
+        • Address: ${addressText}
+        
+        Status: Your attendance is now recorded in the system and will be reflected in your monthly reports.
+        
+        If you have any questions about your attendance or notice any discrepancies, please contact the administration immediately.
+        
+        Best regards,
+        MTC Administration Team
+        
+        ---
+        This is an automated message. Please do not reply to this email.
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Attendance confirmation email sent to ${to}`);
+    return { success: true };
+  } catch (error) {
+    console.log('Error sending attendance confirmation email:', {
+      error: error.message,
+      stack: error.stack,
+      to,
+      tutorName,
+      date,
+      time,
+      centerName,
+      location,
+      timestamp: new Date().toISOString()
+    });
+    throw new Error(`Failed to send attendance confirmation email: ${error.message}`);
+  }
+};
+
 export default {
   sendHadiyaPaymentEmail,
   sendGuestApprovalEmail,
+  sendAttendanceConfirmationEmail,
 };

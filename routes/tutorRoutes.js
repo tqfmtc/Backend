@@ -53,8 +53,20 @@ const tutorValidation = [
   body('sessionTiming')
     .isIn(['after_fajr', 'after_zohar', 'after_asar', 'after_maghrib', 'after_isha'])
     .withMessage('Invalid session timing'),
-  // Make these fields optional as they'll be filled by tutor later
+  // Educational fields - optional
   body('qualifications').optional(),
+  body('qualificationType').optional().isIn(['graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others']).withMessage('Invalid qualification type'),
+  body('qualificationOther').optional().isLength({ max: 50 }).withMessage('Qualification details cannot exceed 50 characters'),
+  body('qualificationStatus').optional().isIn(['pursuing', 'completed']).withMessage('Invalid qualification status'),
+  body('yearOfCompletion').optional().isLength({ min: 4, max: 4 }).withMessage('Year must be 4 digits'),
+  body('madarsahName').optional().isLength({ max: 50 }).withMessage('Madarsah name cannot exceed 50 characters'),
+  // Bank and identification fields - optional
+  body('assignedHadiyaAmount').optional().isNumeric().withMessage('Hadiya amount must be a number'),
+  body('bankName').optional().isLength({ max: 30 }).withMessage('Bank name cannot exceed 30 characters'),
+  body('bankBranch').optional().isLength({ max: 30 }).withMessage('Bank branch cannot exceed 30 characters'),
+  body('accountNumber').optional().isLength({ min: 5, max: 20 }).withMessage('Account number must be between 5-20 digits'),
+  body('ifscCode').optional().matches(/^[A-Z]{4}0[A-Z0-9]{6}$/).withMessage('Invalid IFSC code format'),
+  body('aadharNumber').optional().matches(/^[0-9]{4}\s[0-9]{4}\s[0-9]{4}$/).withMessage('Invalid Aadhar number format'),
   body('documents.aadharNumber').optional(),
   body('documents.aadharPhoto').optional(),
   body('documents.bankAccount.accountNumber').optional(),
@@ -91,6 +103,19 @@ const updateValidation = [
   body('sessionTiming').optional()
     .isIn(['after_fajr', 'after_zohar', 'after_asar', 'after_maghrib', 'after_isha'])
     .withMessage('Invalid session timing'),
+  // Educational fields for update - optional
+  body('qualificationType').optional().isIn(['graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others']).withMessage('Invalid qualification type'),
+  body('qualificationOther').optional().isLength({ max: 50 }).withMessage('Qualification details cannot exceed 50 characters'),
+  body('qualificationStatus').optional().isIn(['pursuing', 'completed']).withMessage('Invalid qualification status'),
+  body('yearOfCompletion').optional().isLength({ min: 4, max: 4 }).withMessage('Year must be 4 digits'),
+  body('madarsahName').optional().isLength({ max: 50 }).withMessage('Madarsah name cannot exceed 50 characters'),
+  // Bank and identification fields for update - optional
+  body('assignedHadiyaAmount').optional().isNumeric().withMessage('Hadiya amount must be a number'),
+  body('bankName').optional().isLength({ max: 30 }).withMessage('Bank name cannot exceed 30 characters'),
+  body('bankBranch').optional().isLength({ max: 30 }).withMessage('Bank branch cannot exceed 30 characters'),
+  body('accountNumber').optional().isLength({ min: 5, max: 20 }).withMessage('Account number must be between 5-20 digits'),
+  body('ifscCode').optional().matches(/^[A-Z]{4}0[A-Z0-9]{6}$/).withMessage('Invalid IFSC code format'),
+  body('aadharNumber').optional().matches(/^[0-9]{4}\s[0-9]{4}\s[0-9]{4}$/).withMessage('Invalid Aadhar number format'),
   body('documents.aadharNumber').optional()
     .matches(/^[0-9]{4}\s[0-9]{4}\s[0-9]{4}$/)
     .withMessage('Please enter a valid Aadhar number in format: XXXX XXXX XXXX'),
@@ -151,8 +176,8 @@ const ensureSubjectsArray = (req, res, next) => {
 };
 
 // Create tutor with file uploads
-router.post('/', protect, adminOnly, 
-  uploadTutorDocuments,
+router.post('/', adminOnly, 
+  upload.fields(tutorUploadFields),
   // First convert subjects to array BEFORE validation runs
   ensureSubjectsArray,
   // Then run the validation
@@ -160,5 +185,88 @@ router.post('/', protect, adminOnly,
   validateRequest,
   createTutor
 );
+
+// Email queue monitoring (Admin only)
+router.get('/email-queue-status', adminOnly, async (req, res) => {
+  try {
+    const { getEmailQueueStatus } = await import('../utils/emailQueue.js');
+    const status = getEmailQueueStatus();
+    
+    res.json({
+      success: true,
+      emailQueue: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Email queue status error:', error);
+    res.status(500).json({ 
+      message: 'Failed to get email queue status', 
+      error: error.message 
+    });
+  }
+});
+
+// Clear failed email jobs (Admin only)
+router.post('/clear-failed-emails', adminOnly, async (req, res) => {
+  try {
+    const { clearFailedEmails } = await import('../utils/emailQueue.js');
+    const clearedCount = clearFailedEmails();
+    
+    res.json({
+      success: true,
+      message: `Cleared ${clearedCount} failed email jobs`,
+      clearedCount
+    });
+  } catch (error) {
+    console.error('Clear failed emails error:', error);
+    res.status(500).json({ 
+      message: 'Failed to clear failed emails', 
+      error: error.message 
+    });
+  }
+});
+
+// Test email functionality (for development/testing purposes)
+router.post('/test-attendance-email', adminOnly, [
+  body('tutorId').isMongoId().withMessage('Invalid tutor ID'),
+  validateRequest
+], async (req, res) => {
+  try {
+    const { queueAttendanceEmail } = await import('../utils/emailQueue.js');
+    const Tutor = (await import('../models/Tutor.js')).default;
+    const tutor = await Tutor.findById(req.body.tutorId).populate('assignedCenter', 'name location');
+    
+    if (!tutor) {
+      return res.status(404).json({ message: 'Tutor not found' });
+    }
+    
+    if (!tutor.email) {
+      return res.status(400).json({ message: 'Tutor email not available' });
+    }
+    
+    const currentTime = new Date();
+    const emailJobId = queueAttendanceEmail({
+      to: tutor.email,
+      tutorName: tutor.name,
+      date: currentTime,
+      time: currentTime,
+      centerName: tutor.assignedCenter?.name || 'Test Center',
+      location: [28.6139, 77.2090], // Sample Delhi coordinates
+      address: tutor.assignedCenter?.location || 'Test Address, Delhi'
+    });
+    
+    res.json({ 
+      message: 'Test attendance confirmation email queued successfully',
+      emailJobId,
+      sentTo: tutor.email 
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ 
+      message: 'Failed to queue test email', 
+      error: error.message 
+    });
+  }
+});
 
 export default router;
