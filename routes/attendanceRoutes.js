@@ -1,11 +1,17 @@
 import express from 'express';
-import { markAttendance, getAttendanceReport, getRecentAttendance, clearRecentAttendance, todayAttendance } from '../controllers/attendanceController.js';
+import { markAttendance, getAttendanceReport, getRecentAttendance, clearRecentAttendance, todayAttendance,getTutorMonthlyCoordinates,toggleAttendanceButton,buttonStatus } from '../controllers/attendanceController.js';
 import { auth, adminOnly } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Protect all routes with authentication
 router.use(auth);
+
+//Disable/Enable attendance button
+router.post('/buttonToggle',adminOnly,toggleAttendanceButton)
+
+//get button status
+router.get('/buttonStatus',buttonStatus)
 
 // Mark attendance
 router.post('/mark', adminOnly, markAttendance);
@@ -15,6 +21,9 @@ router.get('/recent', getRecentAttendance);
 
 // Get attendance report
 router.get('/report', adminOnly, getAttendanceReport);
+
+// Get tutor monthly coordinates (admin only)
+router.get('/tutor-coordinates', adminOnly, getTutorMonthlyCoordinates);
 
 // Get recent attendance
 router.get('/recent', getRecentAttendance);

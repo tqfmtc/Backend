@@ -38,7 +38,7 @@ const tutorSchema = mongoose.Schema(
     // Educational Details - from AddTutorForm
     qualificationType: {
       type: String,
-      enum: ['graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others'],
+      enum: ['','graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others'],
       default: ''
     },
     qualificationOther: {
@@ -48,7 +48,7 @@ const tutorSchema = mongoose.Schema(
     },
     qualificationStatus: {
       type: String,
-      enum: ['pursuing', 'completed'],
+      enum: ['','pursuing', 'completed'],
       default: ''
     },
     yearOfCompletion: {
@@ -77,6 +77,10 @@ const tutorSchema = mongoose.Schema(
       ref: 'Center',
       required: true
     },
+    students: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Student'
+    }],
     subjects: [{
       type: String,
       required: true

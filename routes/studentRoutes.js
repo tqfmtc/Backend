@@ -11,7 +11,8 @@ import {
   markAttendance,
   getStudentAttendanceReport,
   getMonthlyAttendanceReport,
-  getStudentProgress
+  getStudentProgress,
+  changeAssignedTutor
 } from '../controllers/studentController.js';
 
 const router = express.Router();
@@ -47,7 +48,7 @@ router.route('/')
 
 router.route('/:id')
   .get(protect, getStudent)
-  .put(protect, studentValidation, validateRequest, updateStudent)
+  .put(protect, studentValidation, validateRequest, updateStudent,changeAssignedTutor)
   .delete(protect, deleteStudent);
 
 router.route('/:id/attendance')

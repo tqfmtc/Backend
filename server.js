@@ -13,6 +13,8 @@ import hadiyaRoutes from './routes/hadiyaRoutes.js'; // Added
 import guestRoutes from './routes/guestRoutes.js';
 import announcementRoutes from './routes/announcementRoutes.js';
 import nativeRoutes from './routes/native.js';
+import subjectRoutes from './routes/subjectRoutes.js';
+import studentSubjectRoutes from './routes/studentSubjectRoutes.js';
 
 
 // Load env vars
@@ -39,6 +41,8 @@ app.use('/api/supervisor',supervisorRoutes);
 app.use('/api/hadiya', hadiyaRoutes); // Added
 app.use('/api/guest', guestRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use("/api/subjects",subjectRoutes)
+app.use("/api/student-subjects",studentSubjectRoutes)
 app.use('/api/native',nativeRoutes)
 app.use('/api', apiRoutes);
 
@@ -53,6 +57,6 @@ app.use((err, req, res, next) => {
 
 const PORT = 3000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log('Server is running on port 3000');
 });
