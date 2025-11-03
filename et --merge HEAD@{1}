@@ -1,0 +1,69 @@
+[33mc1dd26e[m[33m ([m[1;36mHEAD -> [m[1;32mproduction[m[33m)[m HEAD@{0}: commit (merge): Resolved merge conflicts with remote main
+[33m70f81ac[m HEAD@{1}: commit: reports number inclusion
+[33m5d90ca6[m HEAD@{2}: commit: bug fix2
+[33mf40e68a[m HEAD@{3}: commit: major bug fix
+[33m744e92c[m HEAD@{4}: commit: merge
+[33m10179de[m HEAD@{5}: commit (merge): Merge branch 'production' of https://github.com/codingsenpy/MTC_Backend into production
+[33ma443aaf[m HEAD@{6}: commit (amend): changes
+[33m05463f7[m HEAD@{7}: commit: edu details
+[33m4aa81db[m HEAD@{8}: commit: educational details
+[33ma278707[m HEAD@{9}: commit: host port fix
+[33m553f116[m[33m ([m[1;32mmain[m[33m)[m HEAD@{10}: checkout: moving from main to production
+[33m553f116[m[33m ([m[1;32mmain[m[33m)[m HEAD@{11}: commit: admin activity tracker
+[33mbf58662[m HEAD@{12}: commit: unique coords off
+[33me50ad6e[m HEAD@{13}: pull origin main: Merge made by the 'ort' strategy.
+[33mccc53d0[m HEAD@{14}: commit: forgot tutor password
+[33m78e7164[m HEAD@{15}: commit: improvements
+[33m3f4f1cd[m HEAD@{16}: commit: get->post
+[33m8f8117a[m HEAD@{17}: commit: err fix
+[33m841355a[m HEAD@{18}: commit: port fix
+[33me48c591[m HEAD@{19}: commit: native fix
+[33mcf00a1b[m HEAD@{20}: commit: native implement
+[33m1cbc29f[m HEAD@{21}: commit: cors allow all
+[33m4f81824[m HEAD@{22}: commit: port fix
+[33ma14f6a5[m HEAD@{23}: commit: cors fix
+[33m5380206[m HEAD@{24}: pull origin main: Fast-forward
+[33med771dc[m HEAD@{25}: pull origin main: Fast-forward
+[33m4bea139[m HEAD@{26}: pull origin main: Merge made by the 'ort' strategy.
+[33m853e759[m HEAD@{27}: commit: recent page RT
+[33mb32b334[m HEAD@{28}: pull origin main: Merge made by the 'ort' strategy.
+[33mc6270ae[m HEAD@{29}: commit: fixes
+[33m63b89fe[m HEAD@{30}: commit: auth fix2
+[33m8a650a5[m HEAD@{31}: commit: mdoeel bugs
+[33mde4192e[m HEAD@{32}: commit: auth control
+[33m70d9ba2[m[33m ([m[1;32mphase3[m[33m)[m HEAD@{33}: checkout: moving from phase3 to main
+[33m70d9ba2[m[33m ([m[1;32mphase3[m[33m)[m HEAD@{34}: checkout: moving from main to phase3
+[33mb71625e[m HEAD@{35}: checkout: moving from main to main
+[33mb71625e[m HEAD@{36}: commit: merge phase3 onto main
+[33ma519c43[m HEAD@{37}: checkout: moving from phase3 to main
+[33m70d9ba2[m[33m ([m[1;32mphase3[m[33m)[m HEAD@{38}: commit: comment logic
+[33mc58595e[m HEAD@{39}: pull origin phase3: Fast-forward
+[33m44187ee[m HEAD@{40}: commit: initial logic
+[33mb23b453[m HEAD@{41}: pull origin phase3: Fast-forward
+[33mf5c9129[m HEAD@{42}: commit: model fix
+[33mc697300[m HEAD@{43}: pull origin phase3: Fast-forward
+[33mbdc9504[m HEAD@{44}: pull origin phase3: Merge made by the 'ort' strategy.
+[33mc55243b[m HEAD@{45}: commit: role bug fix
+[33m8590831[m HEAD@{46}: commit: authorise supervisors
+[33m41aa6de[m HEAD@{47}: commit: super
+[33m7434a78[m HEAD@{48}: commit: swap routes
+[33me601352[m HEAD@{49}: commit: import err
+[33m8396741[m HEAD@{50}: commit: cors fix
+[33m4cb75ec[m HEAD@{51}: cherry-pick: supervisor support
+[33m1f873af[m HEAD@{52}: checkout: moving from temp-changes to phase3
+[33mdd11101[m[33m ([m[1;32mtemp-changes[m[33m, [m[1;32mphase2[m[33m)[m HEAD@{53}: checkout: moving from phase2 to temp-changes
+[33mdd11101[m[33m ([m[1;32mtemp-changes[m[33m, [m[1;32mphase2[m[33m)[m HEAD@{54}: checkout: moving from phase3 to phase2
+[33m1f873af[m HEAD@{55}: checkout: moving from phase2 to phase3
+[33mdd11101[m[33m ([m[1;32mtemp-changes[m[33m, [m[1;32mphase2[m[33m)[m HEAD@{56}: commit: supervisor support
+[33m1f873af[m HEAD@{57}: pull origin phase3: Fast-forward
+[33me84f324[m HEAD@{58}: pull origin phase2: Fast-forward
+[33m7a95068[m HEAD@{59}: commit: email bug fix
+[33m70a6b7b[m HEAD@{60}: pull origin phase2: Fast-forward
+[33m054f8af[m HEAD@{61}: commit: centers and studednts deletion logic
+[33m18acc5d[m HEAD@{62}: commit: complete tutor deletion logik
+[33mb8646d6[m HEAD@{63}: commit: email service bug
+[33m2ff543e[m HEAD@{64}: pull origin phase2: Fast-forward
+[33m1a0e084[m HEAD@{65}: commit: deletion logic for tutor
+[33m4836e77[m HEAD@{66}: commit: phase2 models
+[33md8759bb[m HEAD@{67}: checkout: moving from master to phase2
+[33m21905fc[m[33m ([m[1;32mmaster[m[33m)[m HEAD@{68}: commit (initial): Initial commit to new repo
