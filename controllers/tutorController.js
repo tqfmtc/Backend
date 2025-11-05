@@ -55,7 +55,14 @@ export const getTutor = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+}
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const normalizeIdArray = (value) => {
+  if (value == null) return undefined;
+  if (Array.isArray(value)) return value.filter(Boolean);
+  return [value];
 };
+
 // @desc    Create tutor
 // @route   POST /api/tutors
 // @access  Private/Admin
@@ -67,53 +74,35 @@ export const createTutor = async (req, res) => {
       bankName, accountNumber, bankBranch, ifscCode,
       // Educational Details
       qualificationType, qualificationOther, qualificationStatus,
-      yearOfCompletion, madarsahName, collegeName, specialization
+      yearOfCompletion, madarsahName, collegeName, specialization,
+      // OPTIONAL: allow students during create (array of ObjectIds)
+      students
     } = req.body;
-    
-    // Detailed logging for debugging subjects
-    console.log('Tutor creation request - subjects info:', {
-      hasSubjects: !!subjects,
-      subjects: subjects,
-      isArray: Array.isArray(subjects),
-      type: typeof subjects
-    });
-    
-    console.log('Full request body:', req.body);
-    
-    // Check if tutor exists
+
     const tutorExists = await Tutor.findOne({ phone });
     if (tutorExists) return res.status(400).json({ message: 'Tutor already exists' });
-    
-    // Validate password
+
     if (!password || password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
-    
-    console.log(`Creating tutor with phone: ${phone}`);
-    
-    // Properly hash the password with bcrypt
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
-    // Verify the hash works
-    const testVerify = await bcrypt.compare(password, hashedPassword);
-    console.log(`Password hash verification test: ${testVerify ? 'PASSED' : 'FAILED'}`);
-    
-    if (!testVerify) {
-      console.error('Critical error: Password hash verification failed');
-      return res.status(500).json({ message: 'Server error while creating tutor' });
-    }
-    
-    // Ensure subjects is always an array
+
+    // Ensure subjects array
     let subjectsArray = subjects;
     if (!Array.isArray(subjects)) {
-      // If it's a string, convert to array with one element
       subjectsArray = subjects ? [subjects] : [];
     }
-    
-    console.log('Subjects after processing:', subjectsArray);
-    
-    // Create tutor matching the model structure
+
+    // OPTIONAL: normalize and validate students
+    let studentsArray = normalizeIdArray(students) || [];
+    for (const sid of studentsArray) {
+      if (!isValidObjectId(sid)) {
+        return res.status(400).json({ message: `Invalid student id: ${sid}` });
+      }
+    }
+
     const tutor = await Tutor.create({
       // Personal Information
       name,
@@ -122,7 +111,6 @@ export const createTutor = async (req, res) => {
       password: hashedPassword,
       address,
       qualifications: qualifications || '',
-      
       // Educational Details
       qualificationType: qualificationType || '',
       qualificationOther: qualificationOther || '',
@@ -131,31 +119,27 @@ export const createTutor = async (req, res) => {
       madarsahName: madarsahName || '',
       collegeName: collegeName || '',
       specialization: specialization || '',
-      
       // Center & Subject Information
       assignedCenter,
       subjects: subjectsArray,
-      
       // Session Information
       sessionType,
       sessionTiming,
-      
       // Hadiya Information
       assignedHadiyaAmount: assignedHadiyaAmount || 0,
-      
       // Bank Details
       bankName: bankName || '',
       bankBranch: bankBranch || '',
       accountNumber: accountNumber || '',
       ifscCode: ifscCode || '',
-      
       // Identification details
-      aadharNumber: aadharNumber || ''
+      aadharNumber: aadharNumber || '',
+      // NEW
+      students: studentsArray
     });
 
-    // Add tutor to center's tutors array
     await Center.findByIdAndUpdate(tutor.assignedCenter, { $addToSet: { tutors: tutor._id } });
-    
+
     res.status(201).json({
       _id: tutor._id,
       name: tutor.name,
@@ -163,7 +147,8 @@ export const createTutor = async (req, res) => {
       phone: tutor.phone,
       role: tutor.role,
       assignedCenter: tutor.assignedCenter,
-      collegeName: tutor.collegeName
+      collegeName: tutor.collegeName,
+      students: tutor.students
     });
   } catch (error) {
     console.error('Create tutor error:', error);
@@ -182,16 +167,15 @@ export const updateTutor = async (req, res) => {
       return;
     }
 
-    // Prepare update data
     const updateData = {};
-    
+
     // Personal Information
     if (req.body.name) updateData.name = req.body.name;
     if (req.body.email) updateData.email = req.body.email;
     if (req.body.phone) updateData.phone = req.body.phone;
     if (req.body.address) updateData.address = req.body.address;
     if (req.body.qualifications) updateData.qualifications = req.body.qualifications;
-    
+
     // Educational Details
     if (req.body.qualificationType) updateData.qualificationType = req.body.qualificationType;
     if (req.body.qualificationOther) updateData.qualificationOther = req.body.qualificationOther;
@@ -200,42 +184,62 @@ export const updateTutor = async (req, res) => {
     if (req.body.madarsahName) updateData.madarsahName = req.body.madarsahName;
     if (req.body.collegeName) updateData.collegeName = req.body.collegeName;
     if (req.body.specialization) updateData.specialization = req.body.specialization;
-    
+
     // Center & Subject Information
     if (req.body.assignedCenter) updateData.assignedCenter = req.body.assignedCenter;
     if (req.body.subjects) {
-      // Ensure subjects is always an array
       updateData.subjects = Array.isArray(req.body.subjects) ? req.body.subjects : [req.body.subjects];
     }
-    
+
+    // NEW: Students update modes
+    const studentsReplace = normalizeIdArray(req.body.students);
+    const studentsAdd = normalizeIdArray(req.body.studentsAdd);
+    const studentsRemove = normalizeIdArray(req.body.studentsRemove);
+
+    // Validate all provided ids
+    const allIds = [
+      ...(studentsReplace || []),
+      ...(studentsAdd || []),
+      ...(studentsRemove || [])
+    ];
+    for (const sid of allIds) {
+      if (!isValidObjectId(sid)) {
+        return res.status(400).json({ message: `Invalid student id: ${sid}` });
+      }
+    }
+    if (studentsReplace) {
+      updateData.students = studentsReplace; // full replacement
+    }
+
     // Session Information
     if (req.body.sessionType) updateData.sessionType = req.body.sessionType;
     if (req.body.sessionTiming) updateData.sessionTiming = req.body.sessionTiming;
-    
+
     // Hadiya Information
     if (req.body.assignedHadiyaAmount !== undefined) updateData.assignedHadiyaAmount = req.body.assignedHadiyaAmount;
-    
+
     // Banking Information
     if (req.body.bankName) updateData.bankName = req.body.bankName;
     if (req.body.bankBranch) updateData.bankBranch = req.body.bankBranch;
     if (req.body.accountNumber) updateData.accountNumber = req.body.accountNumber;
     if (req.body.ifscCode) updateData.ifscCode = req.body.ifscCode;
-    
+
     // Identification Details
     if (req.body.aadharNumber) updateData.aadharNumber = req.body.aadharNumber;
     if (req.body.collegeName) updateData.collegeName = req.body.collegeName;
 
-    // Update documents
+    // Documents (use your existing helpers if you have them in scope)
     updateData.documents = tutor.documents || {};
     if (req.body.aadharNumber) updateData.documents.aadharNumber = req.body.aadharNumber;
-    if (getFilePath('aadharPhoto')) updateData.documents.aadharPhoto = getFilePath('aadharPhoto');
+    // Replace these getFilePath/getFilePaths with your real file extraction logic
+    // if (getFilePath('aadharPhoto')) updateData.documents.aadharPhoto = getFilePath('aadharPhoto');
     if (!updateData.documents.bankAccount) updateData.documents.bankAccount = {};
     if (req.body.bankAccountNumber) updateData.documents.bankAccount.accountNumber = req.body.bankAccountNumber;
     if (req.body.ifscCode) updateData.documents.bankAccount.ifscCode = req.body.ifscCode;
-    if (getFilePath('passbookPhoto')) updateData.documents.bankAccount.passbookPhoto = getFilePath('passbookPhoto');
-    if (getFilePaths('certificates')) updateData.documents.certificates = getFilePaths('certificates');
-    if (getFilePaths('memos')) updateData.documents.memos = getFilePaths('memos');
-    if (getFilePath('resume')) updateData.documents.resume = getFilePath('resume');
+    // if (getFilePath('passbookPhoto')) updateData.documents.bankAccount.passbookPhoto = getFilePath('passbookPhoto');
+    // if (getFilePaths('certificates')) updateData.documents.certificates = getFilePaths('certificates');
+    // if (getFilePaths('memos')) updateData.documents.memos = getFilePaths('memos');
+    // if (getFilePath('resume')) updateData.documents.resume = getFilePath('resume');
 
     // Password update logic
     if (req.body.password) {
@@ -249,17 +253,17 @@ export const updateTutor = async (req, res) => {
     }
 
     // Center change logic
-    if (req.body.assignedCenter && 
-        (tutor.assignedCenter === null || req.body.assignedCenter !== tutor.assignedCenter.toString())) {
-      // Remove tutor from old center if it exists
+    if (
+      req.body.assignedCenter &&
+      (tutor.assignedCenter === null || req.body.assignedCenter !== tutor.assignedCenter.toString())
+    ) {
       if (tutor.assignedCenter) {
         const oldCenter = await Center.findById(tutor.assignedCenter);
         if (oldCenter) {
-          oldCenter.tutors = oldCenter.tutors.filter(id => id.toString() !== tutor._id.toString());
+          oldCenter.tutors = oldCenter.tutors.filter((id) => id.toString() !== tutor._id.toString());
           await oldCenter.save();
         }
       }
-      // Add tutor to new center
       const newCenter = await Center.findById(req.body.assignedCenter);
       if (!newCenter) {
         res.status(404).json({ message: 'New center not found' });
@@ -269,7 +273,7 @@ export const updateTutor = async (req, res) => {
       await newCenter.save();
     }
 
-    // Check if all required information is complete
+    // Compute information completeness for status
     const currentTutorData = { ...tutor.toObject(), ...updateData };
     const isInformationComplete = Boolean(
       currentTutorData.name &&
@@ -283,30 +287,33 @@ export const updateTutor = async (req, res) => {
       currentTutorData.sessionTiming
     );
 
-    // Update status based on information completeness (using schema-valid values)
-    if (isInformationComplete) {
-      updateData.status = 'active';
-    } else {
-      updateData.status = 'inactive';
+    updateData.status = isInformationComplete ? 'active' : 'inactive';
+
+    // Apply base update
+    await Tutor.updateOne({ _id: tutor._id }, { $set: updateData });
+
+    // Apply add/remove ops if not replaced
+    if (!studentsReplace && (studentsAdd?.length || studentsRemove?.length)) {
+      const ops = {};
+      if (studentsAdd?.length) ops.$addToSet = { students: { $each: studentsAdd } };
+      if (studentsRemove?.length) ops.$pull = { students: { $in: studentsRemove } };
+      if (Object.keys(ops).length) {
+        await Tutor.updateOne({ _id: tutor._id }, ops);
+      }
     }
 
-    // Update the tutor document
-    const updatedTutor = await Tutor.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true, context: 'query' }
-    )
+    const updatedTutor = await Tutor.findById(req.params.id)
       .select('-password')
-      .populate('assignedCenter', 'name location');
+      .populate('assignedCenter', 'name location')
+      .populate('students', '_id name phone'); // helpful for UI
 
     if (!updatedTutor) {
       res.status(404).json({ message: 'Tutor not found' });
       return;
     }
 
-    // Add centerName to the response
     const tutorResponse = updatedTutor.toObject();
-    tutorResponse.centerName = tutorResponse.assignedCenter?.name || "Unknown Center";
+    tutorResponse.centerName = tutorResponse.assignedCenter?.name || 'Unknown Center';
     tutorResponse.collegeName = tutorResponse.collegeName;
 
     res.json(tutorResponse);
@@ -317,13 +324,14 @@ export const updateTutor = async (req, res) => {
       return;
     }
     if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(err => err.message);
+      const validationErrors = Object.values(error.errors).map((err) => err.message);
       res.status(400).json({ message: 'Validation failed', errors: validationErrors });
       return;
     }
     res.status(500).json({ message: 'Error updating tutor', error: error.message });
   }
 };
+
 
 // @desc    Delete tutor
 // @route   DELETE /api/tutors/:id

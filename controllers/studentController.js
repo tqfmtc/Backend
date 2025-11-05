@@ -39,6 +39,18 @@ export const getStudents = async (req, res) => {
   }
 };
 
+export const getStudentByCenter = async (req, res) => {
+  try {
+    const centerId = req.params.centerId;
+    const query = { assignedCenter: centerId, status: 'active' };
+    const students = await Student.find(query)
+      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact');
+    res.json(students);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Get single student
 // @route   GET /api/students/:id
 // @access  Private/Admin & Private/Tutor from same center
