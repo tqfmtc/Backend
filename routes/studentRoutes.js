@@ -12,7 +12,8 @@ import {
   getStudentAttendanceReport,
   getMonthlyAttendanceReport,
   getStudentProgress,
-  changeAssignedTutor
+  changeAssignedTutor,
+  getStudentByCenter
 } from '../controllers/studentController.js';
 
 const router = express.Router();
@@ -45,6 +46,8 @@ const dateRangeValidation = [
 router.route('/')
   .get(protect, getStudents)
   .post(protect, studentValidation, validateRequest, createStudent);
+
+router.get('/getByCenter/:centerId', protect, getStudentByCenter);
 
 router.route('/:id')
   .get(protect, getStudent)
