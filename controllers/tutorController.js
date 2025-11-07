@@ -10,6 +10,8 @@ import { queueAttendanceEmail } from '../utils/emailQueue.js';
 const getFilePath = (files, field) => files[field] && files[field][0] ? files[field][0].path.replace(/\\/g, '/') : null;
 const getFilePaths = (files, field) => files[field] ? files[field].map(f => f.path.replace(/\\/g, '/')) : null;
 
+import mongoose from 'mongoose';
+
 // @desc    Get all tutors
 // @route   GET /api/tutors
 // @access  Private/Admin
