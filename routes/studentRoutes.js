@@ -13,7 +13,8 @@ import {
   getMonthlyAttendanceReport,
   getStudentProgress,
   changeAssignedTutor,
-  getStudentByCenter
+  getStudentByCenter,
+  markDailyAttendance
 } from '../controllers/studentController.js';
 
 const router = express.Router();
@@ -48,6 +49,8 @@ router.route('/')
   .post(protect, studentValidation, validateRequest, createStudent);
 
 router.get('/getByCenter/:centerId', protect, getStudentByCenter);
+
+router.post('/markDailyAttendance',protect,markDailyAttendance)
 
 router.route('/:id')
   .get(protect, getStudent)

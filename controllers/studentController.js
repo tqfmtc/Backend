@@ -56,30 +56,56 @@ export const getStudentByCenter = async (req, res) => {
 // @access  Private/Admin & Private/Tutor from same center
 export const getStudent = async (req, res) => {
   try {
+    console.log('--- 🎓 GET STUDENT DEBUG START ---');
+    console.log('Requested Student ID:', req.params.id);
+    console.log('User Role:', req.role);
+    console.log('Authenticated User ID:', req.user?._id?.toString());
+
     const student = await Student.findOne({ _id: req.params.id, status: 'active' })
-      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact').populate({
-    path: 'subjects',                  // populate StudentSubject
-    populate: {                        // nested populate
-      path: 'subject',                 // populate Subject inside StudentSubject
-      select: 'name'                   // only include the name field
-    }
-  });
-    
+      .populate('assignedCenter', 'name location')
+      .populate('assignedTutor', 'name contact')
+      .populate({
+        path: 'subjects',
+        populate: {
+          path: 'subject',
+          select: 'name',
+        },
+      });
+
     if (!student) {
+      console.log('❌ Student not found.');
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Check if tutor belongs to the same center as the student
+    console.log('✅ Student found:', student._id.toString());
+    console.log('   student.assignedCenter:', student.assignedCenter?._id?.toString() || student.assignedCenter?.toString());
+
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter || 
-          (student.assignedCenter && tutor.assignedCenter.toString() !== student.assignedCenter.toString())) {
+      console.log('👨‍🏫 Tutor found:', tutor?._id?.toString());
+      console.log('   tutor.assignedCenter:', tutor?.assignedCenter?.toString());
+
+      // Handle both populated and raw ObjectId cases
+      const studentCenterId = student.assignedCenter?._id
+        ? student.assignedCenter._id.toString()
+        : student.assignedCenter?.toString();
+      const tutorCenterId = tutor?.assignedCenter?.toString();
+
+      const centerMatch = studentCenterId === tutorCenterId;
+      console.log('🔍 Comparing centers →', studentCenterId, '===', tutorCenterId, '? →', centerMatch);
+
+      if (!tutor || !tutor.assignedCenter || !centerMatch) {
+        console.log('❌ Authorization failed - Not same center');
         return res.status(403).json({ message: 'Not authorized to access this student' });
       }
+
+      console.log('✅ Tutor and student belong to the same center');
     }
-    
+
+    console.log('--- 🎓 GET STUDENT DEBUG END ---');
     res.json(student);
   } catch (error) {
+    console.error('💥 getStudent() Error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -289,6 +315,38 @@ export const deleteStudent = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const markDailyAttendance = async (req, res) => {
+  try{
+    const {date,students}=req.body
+    if(!date || !students || !Array.isArray(students)){
+        return res.status(400).json("date and students array are required")
+    }
+    const results=[]
+    for(const studentAttendance of students){
+        const {studentId, status}=studentAttendance
+        const student= await Student.findById(studentId)
+        if(!student){
+            results.push({studentId, status:"Student not found"})
+            continue
+        }
+        // Check if attendance for the date already exists
+        const existingRecord= student.dailyAttendance.find(record=> record.date===date)
+        if(existingRecord){
+            existingRecord.status=status
+        } else{
+            student.dailyAttendance.push({date, status})
+        }
+        await student.save()
+        results.push({studentId, status:"Attendance marked"})
+    }
+    res.status(200).json(results)
+
+  }
+  catch(error){
+    res.status(500).json({message:error.message})
+  }
+}
 
 // @desc    Mark student attendance
 // @route   POST /api/students/:id/attendance
