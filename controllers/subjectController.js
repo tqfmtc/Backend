@@ -125,6 +125,30 @@ export const getAllSubjects = async (req, res) => {
     }
 };
 
+export const getByCenter = async (req, res) => {
+    try {
+        const { id, centerId } = req.params;
+        
+        const subject = await Subject.findById(id).populate({
+            path: 'students',
+            match: { assignedCenter: centerId },
+            select: 'name email phone assignedCenter'
+        });
+
+        if (!subject) {
+            return res.status(404).json({ message: 'Subject not found' });
+        }
+
+        return res.status(200).json(subject);
+    } catch (error) {
+        console.error('Error fetching subject by center:', error);
+        return res.status(500).json({ 
+            message: 'Error fetching subject', 
+            error: error.message 
+        });
+    }
+};
+
 // Get subject by ID
 export const getSubjectById = async (req, res) => {
     try {
