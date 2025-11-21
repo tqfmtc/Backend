@@ -1,5 +1,5 @@
 import express from 'express';
-import {addSubject, addStudentsToSubject, addTutorsToSubject, getAllSubjects, getSubjectById, updateSubject, deleteSubject} from '../controllers/subjectController.js';
+import {addSubject, addStudentsToSubject, addTutorsToSubject, getAllSubjects, getSubjectById, updateSubject, deleteSubject,getByCenter} from '../controllers/subjectController.js';
 import { auth, adminOnly } from '../middleware/auth.js';
 import { createActivityLogger } from '../middleware/activityLogger.js';
 
@@ -16,6 +16,8 @@ router.post('/add-tutors', auth, adminOnly, createActivityLogger('ADD_TUTORS_TO_
 
 // GET /api/subjects - Get all subjects
 router.get('/', auth, getAllSubjects);
+
+router.get('/:id/:centerId', auth, getByCenter);
 
 // GET /api/subjects/:id - Get subject by ID
 router.get('/:id', auth, getSubjectById);

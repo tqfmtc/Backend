@@ -358,3 +358,116 @@ export const getTutorMonthlyCoordinates = async (req, res) => {
     res.status(500).json({ message: 'Error fetching tutor monthly coordinates', errorDetails: error.message });
   }
 };
+
+/**
+ * Get consolidated tutor coordinates across a date range (multiple months)
+ * @route POST /api/attendance/tutor-coordinates-range
+ * @access Private/Admin
+ * @description Retrieves all attendance coordinates for tutors between a 'from' month/year and 'to' month/year
+ * @body {
+ *   fromMonth: number (1-12),
+ *   fromYear: number,
+ *   toMonth: number (1-12),
+ *   toYear: number,
+ *   tutorId?: string (optional - filter by specific tutor),
+ *   centerId?: string (optional - filter by specific center)
+ * }
+ * @returns Array of objects containing tutor info, center info, and consolidated points across the date range
+ */
+export const getTutorCoordinatesRange = async (req, res) => {
+  try {
+    const { fromMonth, fromYear, toMonth, toYear, tutorId, centerId } = req.body;
+
+    // Validate required fields
+    if (!fromMonth || !fromYear || !toMonth || !toYear) {
+      return res.status(400).json({ 
+        message: 'Missing required fields: fromMonth, fromYear, toMonth, toYear.' 
+      });
+    }
+
+    // Validate month and year values
+    const fromNumMonth = parseInt(fromMonth, 10);
+    const fromNumYear = parseInt(fromYear, 10);
+    const toNumMonth = parseInt(toMonth, 10);
+    const toNumYear = parseInt(toYear, 10);
+
+    if (
+      isNaN(fromNumMonth) || isNaN(fromNumYear) || isNaN(toNumMonth) || isNaN(toNumYear) ||
+      fromNumMonth < 1 || fromNumMonth > 12 || toNumMonth < 1 || toNumMonth > 12
+    ) {
+      return res.status(400).json({ 
+        message: 'Invalid month or year format. Months must be 1-12.' 
+      });
+    }
+
+    // Only admins allowed
+    if (req.role !== 'admin') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    // Calculate the start date (first day of fromMonth) and end date (last day of toMonth)
+    const rangeStartDate = startOfMonth(new Date(fromNumYear, fromNumMonth - 1, 1));
+    const rangeEndDate = endOfMonth(new Date(toNumYear, toNumMonth - 1, 1));
+
+    // Build query for tutors
+    const query = { status: { $in: ['active', 'pending'] } };
+    if (centerId) {
+      query.assignedCenter = centerId;
+    }
+    if (tutorId) {
+      query._id = tutorId;
+    }
+
+    const tutors = await Tutor.find(query).populate('assignedCenter', 'name');
+
+    // Build consolidated data for all tutors in the date range
+    const data = tutors.map(tutor => {
+      const points = [];
+      tutor.attendance.forEach(record => {
+        const recordDate = new Date(record.date);
+        // Include records that fall within the date range and have valid location data
+        if (
+          recordDate >= rangeStartDate &&
+          recordDate <= rangeEndDate &&
+          record.status === 'present' &&
+          record.location &&
+          Array.isArray(record.location.coordinates)
+        ) {
+          const [lng, lat] = record.location.coordinates; // GeoJSON order is [lng, lat]
+          points.push({
+            date: format(recordDate, 'yyyy-MM-dd'),
+            time: format(recordDate, 'HH:mm'),
+            lat,
+            lng,
+            status: record.status
+          });
+        }
+      });
+
+      let centerInfo = { name: 'N/A' };
+      if (tutor.assignedCenter && tutor.assignedCenter.name) {
+        centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
+      }
+
+      return {
+        tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
+        center: centerInfo,
+        dateRange: {
+          from: { month: fromNumMonth, year: fromNumYear },
+          to: { month: toNumMonth, year: toNumYear }
+        },
+        totalPoints: points.length,
+        points
+      };
+    });
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error fetching tutor coordinates range:', error);
+    res.status(500).json({ 
+      message: 'Error fetching tutor coordinates range', 
+      errorDetails: error.message 
+    });
+  }
+};
+

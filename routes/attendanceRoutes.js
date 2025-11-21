@@ -1,5 +1,5 @@
 import express from 'express';
-import { markAttendance, getAttendanceReport, getRecentAttendance, clearRecentAttendance, todayAttendance,getTutorMonthlyCoordinates,toggleAttendanceButton,buttonStatus } from '../controllers/attendanceController.js';
+import { markAttendance, getAttendanceReport, getRecentAttendance, clearRecentAttendance, todayAttendance,getTutorMonthlyCoordinates,getTutorCoordinatesRange,toggleAttendanceButton,buttonStatus } from '../controllers/attendanceController.js';
 import { auth, adminOnly } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -24,6 +24,9 @@ router.get('/report', adminOnly, getAttendanceReport);
 
 // Get tutor monthly coordinates (admin only)
 router.get('/tutor-coordinates', adminOnly, getTutorMonthlyCoordinates);
+
+// Get tutor coordinates across date range (admin only)
+router.post('/tutor-coordinates-range', adminOnly, getTutorCoordinatesRange);
 
 // Get recent attendance
 router.get('/recent', getRecentAttendance);
