@@ -1,6 +1,7 @@
 import Subject from '../models/Subject.js';
 import Student from '../models/Student.js';
 import Tutor from '../models/Tutor.js';
+import StudentSubject from '../models/StudentSubject.js';
 
 // Add new subject
 export const addSubject = async (req, res) => {
@@ -52,36 +53,82 @@ export const updateSubject = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+export const addStudentsToSubject = async (req, res, next) => {
+  try {
+    const { subjectId, studentIds } = req.body;
+    if (!subjectId || !Array.isArray(studentIds)) {
+      return res.status(400).json("subjectId and studentIds(array) are required");
+    }
 
-// Add students to a subject
-export const addStudentsToSubject = async (req, res) => {
+    const subject = await Subject.findById(subjectId);
+    if (!subject) {
+      return res.status(404).json("Subject not found");
+    }
+
+    // Validate all students exist
+    for (const studentId of studentIds) {
+      const student = await Student.findById(studentId);
+      if (!student) {
+        return res.status(404).json(`Student with ID ${studentId} not found`);
+      }
+    }
+
+    // Add students (avoid duplicates)
+    subject.students = [...new Set([...(subject.students || []), ...studentIds])];
+    await subject.save();
+
+    // Pass data to next controller via req object
+    req.body.studentIds = studentIds;
+    req.body.subjectId = subjectId;
+
+    next();
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const removeStudentFromSubject= async (req, res) => {
     try {
-        const { subjectId, studentIds } = req.body;
-        if (!subjectId || !Array.isArray(studentIds)) {
-            return res.status(400).json("subjectId and studentIds(array) are required");
+        const { id } = req.params; // Subject ID
+        const { studentIds } = req.body; // Student ID to be removed
+        if (!studentIds || !Array.isArray(studentIds)) {
+            return res.status(400).json("studentIds(array) is required");
         }
-
-        const subject = await Subject.findById(subjectId);
+        const subject = await Subject.findById(id);
         if (!subject) {
             return res.status(404).json("Subject not found");
         }
-
-        // Validate all students exist
-        for (const studentId of studentIds) {
-            const student = await Student.findById(studentId);
-            if (!student) {
-                return res.status(404).json(`Student with ID ${studentId} not found`);
-            }
-        }
-
-        // Add students (avoid duplicates)
-        subject.students = [...new Set([...(subject.students || []), ...studentIds])];
+        // Remove students
+        subject.students = subject.students.filter(studentId => !studentIds.includes(studentId.toString()));
         await subject.save();
-
-        res.status(200).json("Students added to subject successfully");
+        res.status(200).json("Students removed from subject successfully");
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
+};
+
+export const createStudentSubjectRecord = async (req, res) => {
+  try {
+    const studentIds = req.body.studentIds;
+    const subjectId = req.body.subjectId;
+
+    if (!studentIds || !subjectId) {
+      return res.status(400).json("studentIds and subjectId are required");
+    }
+
+    // Create StudentSubject records for each student
+    await Promise.all(studentIds.map(async (studentId) => {
+      const existingRecord = await StudentSubject.findOne({ student: studentId, subject: subjectId });
+      if (!existingRecord) {
+        await StudentSubject.create({ student: studentId, subject: subjectId });
+      }
+    }));
+
+    res.status(200).json("Students added to subject and student-subject records created successfully");
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // Add tutors to a subject

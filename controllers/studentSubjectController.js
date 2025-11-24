@@ -30,7 +30,8 @@ export const createStudentSubjectRecord = async(req,res)=>{
 
 export const addMarksToStudentSubject = async(req,res)=>{
     try{
-        const {studentId, subjectId, marksPercentage}=req.body
+        const {studentId, subjectId}=req.params
+        const {marksPercentage, examDate}=req.body
         if(!studentId || !subjectId || marksPercentage===undefined){
             return res.status(400).json("studentId, subjectId and marksPercentage are required")
         }
@@ -38,7 +39,7 @@ export const addMarksToStudentSubject = async(req,res)=>{
         if(!record){
             return res.status(404).json("StudentSubject record not found")
         }
-        record.marksPercentage.push({percentage:marksPercentage})
+        record.marksPercentage.push({percentage:marksPercentage, examDate: examDate})
         await record.save()
         res.status(200).json("Marks percentage added successfully")
     }

@@ -1,5 +1,5 @@
 import express from 'express';
-import {addSubject, addStudentsToSubject, addTutorsToSubject, getAllSubjects, getSubjectById, updateSubject, deleteSubject,getByCenter} from '../controllers/subjectController.js';
+import {addSubject, addStudentsToSubject,createStudentSubjectRecord,removeStudentFromSubject, addTutorsToSubject, getAllSubjects, getSubjectById, updateSubject, deleteSubject,getByCenter} from '../controllers/subjectController.js';
 import { auth, adminOnly } from '../middleware/auth.js';
 import { createActivityLogger } from '../middleware/activityLogger.js';
 
@@ -8,8 +8,11 @@ const router = express.Router();
 // POST /api/subjects - Add a new subject (admin only)
 router.post('/', auth, adminOnly, createActivityLogger('CREATE_SUBJECT', 'StudentSubject'), addSubject);
 
+// DELETE /api/subject/remove-students/:id - Delete students from subject
+router.delete('/remove-students/:id', auth, removeStudentFromSubject); 
+
 // POST /api/subjects/add-students - Add students to a subject (admin only)
-router.post('/add-students', auth, createActivityLogger('ADD_STUDENTS_TO_SUBJECT', 'StudentSubject'), addStudentsToSubject);
+router.post('/add-students', auth, addStudentsToSubject,createStudentSubjectRecord);
 
 // POST /api/subjects/add-tutors - Add tutors to a subject (admin only)
 router.post('/add-tutors', auth, adminOnly, createActivityLogger('ADD_TUTORS_TO_SUBJECT', 'StudentSubject'), addTutorsToSubject);
