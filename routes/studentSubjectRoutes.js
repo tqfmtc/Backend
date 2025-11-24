@@ -6,7 +6,7 @@ const router = express.Router();
 // POST /api/student-subjects - Add a student-subject record
 router.post('/',auth,createStudentSubjectRecord);
 // GET /api/student-subjects - Get all student-subject records
-router.get('/',auth,getAllStudentSubjectRecords);
+router.get('/',auth, getAllStudentSubjectRecords);
 
 // PUT /api/student-subjects/:studentId/:subjectId - Update a student-subject record
 router.put('/:studentId/:subjectId',auth,updateStudentSubjectRecord);
