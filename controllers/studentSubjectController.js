@@ -93,25 +93,26 @@ export const getAllStudentSubjectRecords = async (req, res) => {
 
 export const updateStudentSubjectRecord = async (req, res) => {
   try {
-    const { studentId, subjectId } = req.params;
-    const { marksPercentage } = req.body;
+    const { studentId, subjectId } = req.params; // keep semantics
+
     if (!studentId || !subjectId) {
       return res.status(400).json("studentId and subjectId are required");
     }
-    const studentObjectId = new mongoose.Types.ObjectId(studentId);
-    const subjectObjectId = new mongoose.Types.ObjectId(subjectId);
 
-    const record = await StudentSubject.findOne({
-      student: studentObjectId,
-      subject: subjectObjectId,
-    });
+    // Use subjectId as the studentsubject document _id
+    const ssObjectId = new mongoose.Types.ObjectId(subjectId);
+
+    const record = await StudentSubject.findById(ssObjectId);
     if (!record) {
       return res.status(404).json("StudentSubject record not found");
     }
+
+    const { marksPercentage } = req.body;
     if (marksPercentage !== undefined) {
       record.marksPercentage.push({ percentage: marksPercentage });
     }
     await record.save();
+
     res.status(200).json(record);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -120,17 +121,16 @@ export const updateStudentSubjectRecord = async (req, res) => {
 
 export const deleteStudentSubjectRecord = async (req, res) => {
   try {
-    const { studentId, subjectId } = req.params;
+    const { studentId, subjectId } = req.params; // keep semantics
+
     if (!studentId || !subjectId) {
       return res.status(400).json("studentId and subjectId are required");
     }
-    const studentObjectId = new mongoose.Types.ObjectId(studentId);
-    const subjectObjectId = new mongoose.Types.ObjectId(subjectId);
 
-    const record = await StudentSubject.findOneAndDelete({
-      student: studentObjectId,
-      subject: subjectObjectId,
-    });
+    // Use subjectId as the studentsubject document _id
+    const ssObjectId = new mongoose.Types.ObjectId(subjectId);
+
+    const record = await StudentSubject.findByIdAndDelete(ssObjectId);
     if (!record) {
       return res.status(404).json("StudentSubject record not found");
     }
