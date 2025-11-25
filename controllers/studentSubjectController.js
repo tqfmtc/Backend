@@ -1,4 +1,4 @@
-import StudentSubject from '../models/StudentSubject.js';
+ import StudentSubject from '../models/StudentSubject.js';
 import Student from '../models/Student.js';
 import Subject from '../models/Subject.js';
 import mongoose from 'mongoose';
@@ -35,11 +35,11 @@ export const addMarksToStudentSubject = async (req, res) => {
     const { subjectId } = req.params; // new param: the studentsubject document _id
     const { marksPercentage, examDate } = req.body;
 
-    if (!studentsubjectId || marksPercentage === undefined) {
-      return res.status(400).json("studentsubjectId and marksPercentage are required");
+    if (!subjectId || marksPercentage === undefined) {
+      return res.status(400).json("subjectId and marksPercentage are required");
     }
 
-    const ssObjectId = new mongoose.Types.ObjectId(studentsubjectId);
+    const ssObjectId = new mongoose.Types.ObjectId(subjectId);
 
     // Find by the document's own _id
     const record = await StudentSubject.findById(ssObjectId);
