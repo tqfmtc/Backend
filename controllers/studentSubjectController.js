@@ -32,10 +32,12 @@ export const addMarksToStudentSubject = async(req,res)=>{
     try{
         const {studentId, subjectId}=req.params
         const {marksPercentage, examDate}=req.body
+        console.log(studentId,subjectId,marksPercentage,examDate)
         if(!studentId || !subjectId || marksPercentage===undefined){
             return res.status(400).json("studentId, subjectId and marksPercentage are required")
         }
         const record= await StudentSubject.findOne({student:studentId, subject:subjectId})
+        console.log(record)
         if(!record){
             return res.status(404).json("StudentSubject record not found")
         }
