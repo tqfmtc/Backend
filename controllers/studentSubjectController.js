@@ -1,6 +1,7 @@
 import StudentSubject from '../models/StudentSubject.js';
 import Student from '../models/Student.js';
 import Subject from '../models/Subject.js';
+import mongoose from 'mongoose'
 
 export const createStudentSubjectRecord = async(req,res)=>{
     try{
@@ -27,28 +28,38 @@ export const createStudentSubjectRecord = async(req,res)=>{
         res.status(500).json({message:error.message})
     }
 }
+import mongoose from 'mongoose';
 
-export const addMarksToStudentSubject = async(req,res)=>{
-    try{
-        const {studentId, subjectId}=req.params
-        const {marksPercentage, examDate}=req.body
-        console.log(studentId,subjectId,marksPercentage,examDate)
-        if(!studentId || !subjectId || marksPercentage===undefined){
-            return res.status(400).json("studentId, subjectId and marksPercentage are required")
-        }
-        const record= await StudentSubject.findOne({student:studentId, subject:subjectId})
-        console.log(record)
-        if(!record){
-            return res.status(404).json("StudentSubject record not found")
-        }
-        record.marksPercentage.push({percentage:marksPercentage, examDate: examDate})
-        await record.save()
-        res.status(200).json("Marks percentage added successfully")
+export const addMarksToStudentSubject = async (req, res) => {
+  try {
+    const { studentId, subjectId } = req.params;
+    const { marksPercentage, examDate } = req.body;
+    console.log(studentId, subjectId, marksPercentage, examDate);
+
+    if (!studentId || !subjectId || marksPercentage === undefined) {
+      return res.status(400).json("studentId, subjectId and marksPercentage are required");
     }
-    catch(error){
-        res.status(500).json({message:error.message})
+
+    // Cast strings to ObjectId
+    const studentObjectId = mongoose.Types.ObjectId(studentId);
+    const subjectObjectId = mongoose.Types.ObjectId(subjectId);
+
+    const record = await StudentSubject.findOne({
+      student: studentObjectId,
+      subject: subjectObjectId,
+    });
+    console.log(record);
+    if (!record) {
+      return res.status(404).json("StudentSubject record not found");
     }
-}
+    record.marksPercentage.push({ percentage: marksPercentage, examDate: examDate });
+    await record.save();
+    res.status(200).json("Marks percentage added successfully");
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export const getStudentSubjectRecord = async(req,res)=>{
     try{
         const {studentId, subjectId}=req.params
