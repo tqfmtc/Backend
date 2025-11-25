@@ -8,11 +8,11 @@ router.post('/',auth,createStudentSubjectRecord);
 // GET /api/student-subjects - Get all student-subject records
 router.get('/',auth, getAllStudentSubjectRecords);
 
-// PUT /api/student-subjects/:studentId/:subjectId - Update a student-subject record
-router.put('/:studentId/:subjectId',auth,updateStudentSubjectRecord);
-
 // POST /api/student-subjects/:studentId/:subjectId/marks - Add marks to a student-subject record
 router.post('/marks/:studentId/:subjectId',auth,addMarksToStudentSubject);
+
+// PUT /api/student-subjects/:studentId/:subjectId - Update a student-subject record
+router.put('/:studentId/:subjectId',auth,updateStudentSubjectRecord);
 
 // GET /api/student-subjects/student/:studentId - Get all subjects for a student
 router.get('/student/:studentId',auth,getSubjectsByStudent);
