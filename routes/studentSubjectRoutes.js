@@ -12,7 +12,7 @@ router.get('/',auth, getAllStudentSubjectRecords);
 router.post('/marks/:studentId/:subjectId',auth,addMarksToStudentSubject);
 
 // PUT /api/student-subjects/:studentId/:subjectId - Update a student-subject record
-router.put('/:studentId/:subjectId',auth,updateStudentSubjectRecord);
+router.put('/update/:studentId/:subjectId',auth,updateStudentSubjectRecord);
 
 // GET /api/student-subjects/student/:studentId - Get all subjects for a student
 router.get('/student/:studentId',auth,getSubjectsByStudent);
@@ -23,5 +23,5 @@ router.get('/subject/:subjectId',auth,getStudentsBySubject);
 
 
 // DELETE /api/student-subjects/:studentId/:subjectId - Delete a student-subject record
-router.delete('/:studentId/:subjectId',auth,deleteStudentSubjectRecord);
+router.delete('/delete/:studentId/:subjectId',auth,deleteStudentSubjectRecord);
 export default router;
