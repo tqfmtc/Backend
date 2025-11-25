@@ -32,15 +32,16 @@ export const createStudentSubjectRecord = async (req, res) => {
 };
 export const addMarksToStudentSubject = async (req, res) => {
   try {
+   console.log("entering admarks")
     const { subjectId } = req.params; // new param: the studentsubject document _id
     const { marksPercentage, examDate } = req.body;
-
+    console.log("subjectId:",subjectId)
     if (!subjectId || marksPercentage === undefined) {
       return res.status(400).json("subjectId and marksPercentage are required");
     }
 
     const ssObjectId = new mongoose.Types.ObjectId(subjectId);
-
+    console.log(ssObjectId)
     // Find by the document's own _id
     const record = await StudentSubject.findById(ssObjectId);
 
