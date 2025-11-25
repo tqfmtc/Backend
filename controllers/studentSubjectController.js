@@ -32,7 +32,7 @@ export const createStudentSubjectRecord = async (req, res) => {
 };
 export const addMarksToStudentSubject = async (req, res) => {
   try {
-    const { studentsubjectId } = req.params; // new param: the studentsubject document _id
+    const { subjectId } = req.params; // new param: the studentsubject document _id
     const { marksPercentage, examDate } = req.body;
 
     if (!studentsubjectId || marksPercentage === undefined) {
