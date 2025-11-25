@@ -32,6 +32,7 @@ export const addMarksToStudentSubject = async(req,res)=>{
     try{
         const {studentId, subjectId}=req.params
         const {marksPercentage, examDate}=req.body
+        console.log
         if(!studentId || !subjectId || marksPercentage===undefined){
             return res.status(400).json("studentId, subjectId and marksPercentage are required")
         }

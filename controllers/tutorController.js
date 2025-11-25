@@ -76,7 +76,7 @@ export const createTutor = async (req, res) => {
       bankName, accountNumber, bankBranch, ifscCode,
       // Educational Details
       qualificationType, qualificationOther, qualificationStatus,
-      yearOfCompletion, madarsahName, collegeName, specialization,
+      yearOfCompletion, madarsahName, collegeName, specialization, joiningDate,
       // OPTIONAL: allow students during create (array of ObjectIds)
       students
     } = req.body;
@@ -127,6 +127,7 @@ export const createTutor = async (req, res) => {
       // Session Information
       sessionType,
       sessionTiming,
+      joiningDate: joiningDate || Date.now(),
       // Hadiya Information
       assignedHadiyaAmount: assignedHadiyaAmount || 0,
       // Bank Details
@@ -178,6 +179,16 @@ export const updateTutor = async (req, res) => {
     if (req.body.address) updateData.address = req.body.address;
     if (req.body.qualifications) updateData.qualifications = req.body.qualifications;
 
+    // Joining Date Logic (Completed)
+    if (req.body.joiningDate) {
+      const date = new Date(req.body.joiningDate);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ message: 'Invalid joining date format' });
+      }
+      updateData.joiningDate = date;
+    }
+    // Important: If not provided, old value remains automatically.
+
     // Educational Details
     if (req.body.qualificationType) updateData.qualificationType = req.body.qualificationType;
     if (req.body.qualificationOther) updateData.qualificationOther = req.body.qualificationOther;
@@ -190,7 +201,9 @@ export const updateTutor = async (req, res) => {
     // Center & Subject Information
     if (req.body.assignedCenter) updateData.assignedCenter = req.body.assignedCenter;
     if (req.body.subjects) {
-      updateData.subjects = Array.isArray(req.body.subjects) ? req.body.subjects : [req.body.subjects];
+      updateData.subjects = Array.isArray(req.body.subjects)
+        ? req.body.subjects
+        : [req.body.subjects];
     }
 
     // NEW: Students update modes
@@ -218,7 +231,8 @@ export const updateTutor = async (req, res) => {
     if (req.body.sessionTiming) updateData.sessionTiming = req.body.sessionTiming;
 
     // Hadiya Information
-    if (req.body.assignedHadiyaAmount !== undefined) updateData.assignedHadiyaAmount = req.body.assignedHadiyaAmount;
+    if (req.body.assignedHadiyaAmount !== undefined)
+      updateData.assignedHadiyaAmount = req.body.assignedHadiyaAmount;
 
     // Banking Information
     if (req.body.bankName) updateData.bankName = req.body.bankName;
@@ -230,18 +244,16 @@ export const updateTutor = async (req, res) => {
     if (req.body.aadharNumber) updateData.aadharNumber = req.body.aadharNumber;
     if (req.body.collegeName) updateData.collegeName = req.body.collegeName;
 
-    // Documents (use your existing helpers if you have them in scope)
+    // Documents
     updateData.documents = tutor.documents || {};
     if (req.body.aadharNumber) updateData.documents.aadharNumber = req.body.aadharNumber;
-    // Replace these getFilePath/getFilePaths with your real file extraction logic
-    // if (getFilePath('aadharPhoto')) updateData.documents.aadharPhoto = getFilePath('aadharPhoto');
+
     if (!updateData.documents.bankAccount) updateData.documents.bankAccount = {};
-    if (req.body.bankAccountNumber) updateData.documents.bankAccount.accountNumber = req.body.bankAccountNumber;
-    if (req.body.ifscCode) updateData.documents.bankAccount.ifscCode = req.body.ifscCode;
-    // if (getFilePath('passbookPhoto')) updateData.documents.bankAccount.passbookPhoto = getFilePath('passbookPhoto');
-    // if (getFilePaths('certificates')) updateData.documents.certificates = getFilePaths('certificates');
-    // if (getFilePaths('memos')) updateData.documents.memos = getFilePaths('memos');
-    // if (getFilePath('resume')) updateData.documents.resume = getFilePath('resume');
+    if (req.body.bankAccountNumber)
+      updateData.documents.bankAccount.accountNumber = req.body.bankAccountNumber;
+
+    if (req.body.ifscCode)
+      updateData.documents.bankAccount.ifscCode = req.body.ifscCode;
 
     // Password update logic
     if (req.body.password) {
@@ -257,12 +269,15 @@ export const updateTutor = async (req, res) => {
     // Center change logic
     if (
       req.body.assignedCenter &&
-      (tutor.assignedCenter === null || req.body.assignedCenter !== tutor.assignedCenter.toString())
+      (tutor.assignedCenter === null ||
+        req.body.assignedCenter !== tutor.assignedCenter.toString())
     ) {
       if (tutor.assignedCenter) {
         const oldCenter = await Center.findById(tutor.assignedCenter);
         if (oldCenter) {
-          oldCenter.tutors = oldCenter.tutors.filter((id) => id.toString() !== tutor._id.toString());
+          oldCenter.tutors = oldCenter.tutors.filter(
+            (id) => id.toString() !== tutor._id.toString()
+          );
           await oldCenter.save();
         }
       }
@@ -279,14 +294,14 @@ export const updateTutor = async (req, res) => {
     const currentTutorData = { ...tutor.toObject(), ...updateData };
     const isInformationComplete = Boolean(
       currentTutorData.name &&
-      currentTutorData.email &&
-      currentTutorData.phone &&
-      currentTutorData.address &&
-      currentTutorData.assignedCenter &&
-      currentTutorData.subjects &&
-      currentTutorData.subjects.length > 0 &&
-      currentTutorData.sessionType &&
-      currentTutorData.sessionTiming
+        currentTutorData.email &&
+        currentTutorData.phone &&
+        currentTutorData.address &&
+        currentTutorData.assignedCenter &&
+        currentTutorData.subjects &&
+        currentTutorData.subjects.length > 0 &&
+        currentTutorData.sessionType &&
+        currentTutorData.sessionTiming
     );
 
     updateData.status = isInformationComplete ? 'active' : 'inactive';
@@ -294,7 +309,7 @@ export const updateTutor = async (req, res) => {
     // Apply base update
     await Tutor.updateOne({ _id: tutor._id }, { $set: updateData });
 
-    // Apply add/remove ops if not replaced
+    // Apply add/remove student ops if not replaced
     if (!studentsReplace && (studentsAdd?.length || studentsRemove?.length)) {
       const ops = {};
       if (studentsAdd?.length) ops.$addToSet = { students: { $each: studentsAdd } };
@@ -307,7 +322,7 @@ export const updateTutor = async (req, res) => {
     const updatedTutor = await Tutor.findById(req.params.id)
       .select('-password')
       .populate('assignedCenter', 'name location')
-      .populate('students', '_id name phone'); // helpful for UI
+      .populate('students', '_id name phone');
 
     if (!updatedTutor) {
       res.status(404).json({ message: 'Tutor not found' });
@@ -333,7 +348,6 @@ export const updateTutor = async (req, res) => {
     res.status(500).json({ message: 'Error updating tutor', error: error.message });
   }
 };
-
 
 // @desc    Delete tutor
 // @route   DELETE /api/tutors/:id

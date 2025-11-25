@@ -97,7 +97,10 @@ const tutorSchema = mongoose.Schema(
       enum: ['after_fajr', 'after_zohar', 'after_asar', 'after_maghrib', 'after_isha'],
       required: true
     },
-    
+    joiningDate: {
+    type: Date,
+    default: Date.now
+    },
     // Role and Status
     role: {
       type: String,
