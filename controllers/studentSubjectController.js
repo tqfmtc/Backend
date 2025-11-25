@@ -12,9 +12,27 @@ export const createStudentSubjectRecord = async (req, res) => {
     const studentObjectId = new mongoose.Types.ObjectId(studentId);
     const subjectObjectId = new mongoose.Types.ObjectId(subjectId);
 
+<<<<<<< HEAD
     const student = await Student.findById(studentObjectId);
     if (!student) {
       return res.status(404).json("Student not found");
+=======
+export const addMarksToStudentSubject = async(req,res)=>{
+    try{
+        const {studentId, subjectId}=req.params
+        const {marksPercentage, examDate}=req.body
+        console.log
+        if(!studentId || !subjectId || marksPercentage===undefined){
+            return res.status(400).json("studentId, subjectId and marksPercentage are required")
+        }
+        const record= await StudentSubject.findOne({student:studentId, subject:subjectId})
+        if(!record){
+            return res.status(404).json("StudentSubject record not found")
+        }
+        record.marksPercentage.push({percentage:marksPercentage, examDate: examDate})
+        await record.save()
+        res.status(200).json("Marks percentage added successfully")
+>>>>>>> recover-stash
     }
     const subject = await Subject.findById(subjectObjectId);
     if (!subject) {
