@@ -40,9 +40,9 @@ export const addMarksToStudentSubject = async (req, res) => {
     if (!studentId || !subjectId || marksPercentage === undefined) {
       return res.status(400).json("studentId, subjectId and marksPercentage are required");
     }
+const studentObjectId = new mongoose.Types.ObjectId(studentId);
+const subjectObjectId = new mongoose.Types.ObjectId(subjectId);
 
-    const studentObjectId = mongoose.Types.ObjectId(studentId);
-    const subjectObjectId = mongoose.Types.ObjectId(subjectId);
 
     const record = await StudentSubject.findOne({
       student: studentObjectId,
