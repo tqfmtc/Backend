@@ -1,5 +1,5 @@
 import express from 'express';
-import {createStudentSubjectRecord, getAllStudentSubjectRecords, deleteStudentSubjectRecord,addMarksToStudentSubject,getStudentSubjectRecord,updateStudentSubjectRecord,getSubjectsByStudent,getStudentsBySubject} from '../controllers/studentSubjectController.js';
+import {createStudentSubjectRecord, getAllStudentSubjectRecords, deleteMarksFromStudentSubject,addMarksToStudentSubject,getStudentSubjectRecord,updateStudentSubjectRecord,getSubjectsByStudent,getStudentsBySubject} from '../controllers/studentSubjectController.js';
 import { auth } from '../middleware/auth.js';
 import { createActivityLogger } from '../middleware/activityLogger.js';
 const router = express.Router();
@@ -22,6 +22,6 @@ router.get('/subject/:subjectId',auth,getStudentsBySubject);
 
 
 
-// DELETE /api/student-subjects/:studentId/:subjectId - Delete a student-subject record
-router.delete('/delete/:studentId/:subjectId',auth,deleteStudentSubjectRecord);
+// DELETE /api/student-subjects/:studentId/:subjectId - Delete a mark from student-subject record
+router.delete('/delete/:markId/:subjectId',auth,deleteMarksFromStudentSubject);
 export default router;
