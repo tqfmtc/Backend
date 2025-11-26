@@ -119,26 +119,48 @@ export const updateStudentSubjectRecord = async (req, res) => {
   }
 };
 
-export const deleteStudentSubjectRecord = async (req, res) => {
+export const deleteMarksFromStudentSubject = async (req, res) => {
   try {
-    const { studentId, subjectId } = req.params; // keep semantics
-
-    if (!studentId || !subjectId) {
-      return res.status(400).json("studentId and subjectId are required");
+    const { subjectId, markId } = req.params;
+    if (!subjectId || !markId) {
+      return res.status(400).json("subjectId and markId are required");
     }
-
-    // Use subjectId as the studentsubject document _id
-    const ssObjectId = new mongoose.Types.ObjectId(subjectId);
-
-    const record = await StudentSubject.findByIdAndDelete(ssObjectId);
+    const subjectObjectId = new mongoose.Types.ObjectId(subjectId);
+    const markObjectId = new mongoose.Types.ObjectId(markId);
+    const record = await StudentSubject.findById(subjectObjectId);
     if (!record) {
       return res.status(404).json("StudentSubject record not found");
     }
-    res.status(200).json("StudentSubject record deleted successfully");
-  } catch (error) {
+    // Remove the mark entry by its _id
+    record.marksPercentage = record.marksPercentage.filter(mark => mark._id.toString() !== markObjectId.toString());
+    await record.save();
+    res.status(200).json("Mark entry deleted successfully");
+  }
+    catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
+// export const deleteStudentSubjectRecord = async (req, res) => {
+//   try {
+//     const { studentId, subjectId } = req.params; // keep semantics
+
+//     if (!studentId || !subjectId) {
+//       return res.status(400).json("studentId and subjectId are required");
+//     }
+
+//     // Use subjectId as the studentsubject document _id
+//     const ssObjectId = new mongoose.Types.ObjectId(subjectId);
+
+//     const record = await StudentSubject.findByIdAndDelete(ssObjectId);
+//     if (!record) {
+//       return res.status(404).json("StudentSubject record not found");
+//     }
+//     res.status(200).json("StudentSubject record deleted successfully");
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
 
 export const getSubjectsByStudent = async (req, res) => {
   try {
