@@ -7,6 +7,7 @@ import { createActivityLogger } from '../middleware/activityLogger.js';
 import {
   getTutors,
   getTutor,
+  getTutorsByCenter,
   createTutor,
   updateTutor,
   deleteTutor,
@@ -140,6 +141,9 @@ router.route('/:id')
   .get(getTutor)
   .put(adminOnly, createActivityLogger('UPDATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
   .delete(adminOnly, createActivityLogger('DELETE_TUTOR', 'Tutor'), deleteTutor);
+
+// Get tutors by center
+router.get('/center/:centerId', getTutorsByCenter);
 
 // Report routes
 router.get('/:id/attendance', getTutorAttendanceReport);

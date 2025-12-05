@@ -170,7 +170,9 @@ export const getSubjectsByStudent = async (req, res) => {
     }
     const studentObjectId = new mongoose.Types.ObjectId(studentId);
 
-    const records = await StudentSubject.find({ student: studentObjectId }).populate('subject');
+    const records = await StudentSubject.find({ student: studentObjectId })
+      .populate('subject', 'subjectName')
+      .populate('student', 'name');
     res.status(200).json(records);
   } catch (error) {
     res.status(500).json({ message: error.message });

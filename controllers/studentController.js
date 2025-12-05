@@ -25,7 +25,9 @@ export const getStudents = async (req, res) => {
     }
 
     const students = await Student.find(query)
-      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact').populate({
+      .populate('assignedCenter', 'name location')
+      .populate('assignedTutor', 'name contact email')
+      .populate({
     path: 'subjects',                  // populate StudentSubject
     populate: {                        // nested populate
       path: 'subject',                 // populate Subject inside StudentSubject
@@ -44,7 +46,8 @@ export const getStudentByCenter = async (req, res) => {
     const centerId = req.params.centerId;
     const query = { assignedCenter: centerId, status: 'active' };
     const students = await Student.find(query)
-      .populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact');
+      .populate('assignedCenter', 'name location')
+      .populate('assignedTutor', 'name contact email');
     res.json(students);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -63,7 +66,7 @@ export const getStudent = async (req, res) => {
 
     const student = await Student.findOne({ _id: req.params.id, status: 'active' })
       .populate('assignedCenter', 'name location')
-      .populate('assignedTutor', 'name contact')
+      .populate('assignedTutor', 'name contact email')
       .populate({
         path: 'subjects',
         populate: {
@@ -193,7 +196,8 @@ export const createStudent = async (req, res) => {
 
     // Populate the response with center details
     const populatedStudent = await Student.findById(student._id)
-      .populate('assignedCenter', 'name location');
+      .populate('assignedCenter', 'name location')
+      .populate('assignedTutor', 'name contact email');
 
     res.status(201).json(populatedStudent);
   } catch (error) {
@@ -226,6 +230,31 @@ export const updateStudent = async (req, res) => {
       }
     }
 
+    // Handle assignedTutor validation and update
+    if (req.body.assignedTutor) {
+      // Check if tutor is being changed
+      const oldTutorId = student.assignedTutor?.toString();
+      const newTutorId = req.body.assignedTutor;
+      
+      if (oldTutorId !== newTutorId) {
+        // Verify new tutor exists
+        const newTutor = await Tutor.findById(newTutorId);
+        if (!newTutor) {
+          return res.status(404).json({ message: 'Assigned tutor not found' });
+        }
+
+        // Remove student from old tutor's students array
+        if (oldTutorId) {
+          await Tutor.findByIdAndUpdate(oldTutorId, { $pull: { students: student._id } });
+        }
+
+        // Add student to new tutor's students array
+        await Tutor.findByIdAndUpdate(newTutorId, { $addToSet: { students: student._id } });
+      }
+
+      student.assignedTutor = newTutorId;
+    }
+
     // If center is being changed
     if (req.body.assignedCenter && req.body.assignedCenter !== student.assignedCenter.toString()) {
       // Remove student from old center
@@ -233,15 +262,6 @@ export const updateStudent = async (req, res) => {
       if (oldCenter) {
         oldCenter.students = oldCenter.students.filter(id => id.toString() !== student._id.toString());
         await oldCenter.save();
-      }
-
-      //add assignedTutor
-      if (req.body.assignedTutor) {
-        const tutor = await Tutor.findById(req.body.assignedTutor);
-        if (!tutor) {
-          return res.status(404).json({ message: 'Assigned tutor not found' });
-        }
-        student.assignedTutor = req.body.assignedTutor;
       }
 
       // Add student to new center
@@ -262,7 +282,7 @@ export const updateStudent = async (req, res) => {
       req.params.id,
       req.body,
       { new: true, runValidators: true }
-    );
+    ).populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact email');
 
     res.json(updatedStudent);
   } catch (error) {
@@ -284,7 +304,13 @@ export const changeAssignedTutor = async (req, res) => {
     }
     student.assignedTutor = tutorId;
     await student.save();
-    res.json({ message: 'Assigned tutor updated successfully', student });
+    
+    // Populate the response with tutor details
+    const updatedStudent = await Student.findById(student._id)
+      .populate('assignedCenter', 'name location')
+      .populate('assignedTutor', 'name contact email');
+    
+    res.json({ message: 'Assigned tutor updated successfully', student: updatedStudent });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -530,6 +556,111 @@ export const getStudentProgress = async (req, res) => {
       }
     });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get full report for multiple students with filtered data
+// @route   POST /api/students/FullReport/students
+// @access  Private/Admin
+export const getStudentFullReport = async (req, res) => {
+  try {
+    const { fromMonth, toMonth, year, studentIds } = req.body;
+
+    // Validate inputs
+    if (!fromMonth || !toMonth || !year || !studentIds || !Array.isArray(studentIds)) {
+      return res.status(400).json({ 
+        message: 'fromMonth, toMonth, year, and studentIds array are required' 
+      });
+    }
+
+    // Convert month names to numbers (e.g., "January" -> 1)
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December'];
+    const fromMonthNum = monthNames.indexOf(fromMonth) + 1;
+    const toMonthNum = monthNames.indexOf(toMonth) + 1;
+
+    if (fromMonthNum === 0 || toMonthNum === 0) {
+      return res.status(400).json({ message: 'Invalid month names provided' });
+    }
+
+    // Create date range for filtering
+    const startDate = new Date(year, fromMonthNum - 1, 1);
+    const endDate = new Date(year, toMonthNum, 0); // Last day of toMonth
+
+    // Import StudentSubject model dynamically
+    const StudentSubject = (await import('../models/StudentSubject.js')).default;
+
+    // Fetch all students with populated fields
+    const students = await Student.find({ _id: { $in: studentIds } })
+      .populate('assignedCenter', 'name location')
+      .populate('assignedTutor', 'name contact email')
+      .populate({
+        path: 'subjects',
+        populate: {
+          path: 'subject',
+          select: 'name description',
+        },
+      });
+
+    // Process each student to filter attendance and marks
+    const processedStudents = await Promise.all(
+      students.map(async (student) => {
+        const studentObj = student.toObject();
+
+        // Filter attendance by date range
+        studentObj.attendance = studentObj.attendance.filter((att) => {
+          // Parse month string (format: "January 2024", "February 2024", etc.)
+          const [monthName, attYear] = att.month.split(' ');
+          const attMonthNum = monthNames.indexOf(monthName) + 1;
+          const attYearNum = parseInt(attYear);
+
+          // Check if attendance falls within the range
+          if (attYearNum !== parseInt(year)) return false;
+          return attMonthNum >= fromMonthNum && attMonthNum <= toMonthNum;
+        });
+
+        // Fetch student subject records for marks filtering
+        const subjectRecords = await StudentSubject.find({ 
+          student: student._id 
+        })
+          .populate('subject', 'name description')
+          .lean();
+
+        // Filter marks by date range
+        const filteredSubjects = subjectRecords.map((record) => {
+          const filteredMarks = record.marksPercentage.filter((mark) => {
+            const examDate = new Date(mark.examDate);
+            return examDate >= startDate && examDate <= endDate;
+          });
+
+          return {
+            ...record,
+            marksPercentage: filteredMarks,
+          };
+        });
+
+        // Add filtered marks to student object
+        studentObj.subjectMarks = filteredSubjects;
+
+        return studentObj;
+      })
+    );
+
+    res.json({
+      success: true,
+      count: processedStudents.length,
+      dateRange: {
+        fromMonth,
+        toMonth,
+        year,
+        startDate,
+        endDate,
+      },
+      students: processedStudents,
+    });
+  } catch (error) {
+    console.error('Error in getStudentFullReport:', error);
     res.status(500).json({ message: error.message });
   }
 };

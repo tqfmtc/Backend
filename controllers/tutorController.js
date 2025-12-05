@@ -58,6 +58,39 @@ export const getTutor = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 }
+
+// @desc    Get tutors by center
+// @route   GET /api/tutors/center/:centerId
+// @access  Private/Admin & Private/Tutor from same center
+export const getTutorsByCenter = async (req, res) => {
+  try {
+    const { centerId } = req.params;
+    
+    // Verify center exists
+    const center = await Center.findById(centerId);
+    if (!center) {
+      return res.status(404).json({ message: 'Center not found' });
+    }
+
+    // If tutor is requesting, they must belong to the same center
+    if (req.role === 'tutor') {
+      const tutor = await Tutor.findById(req.user._id);
+      if (!tutor || tutor.assignedCenter.toString() !== centerId) {
+        return res.status(403).json({ message: 'Not authorized to view tutors from this center' });
+      }
+    }
+
+    // Get all active tutors for this center
+    const tutors = await Tutor.find({ assignedCenter: centerId })
+      .populate('assignedCenter', 'name location')
+      .select('_id name contact email assignedCenter');
+
+    res.json(tutors);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const normalizeIdArray = (value) => {
   if (value == null) return undefined;
@@ -492,7 +525,11 @@ export const getTutorPerformanceReport = async (req, res) => {
 // @access  Private
 export const getTutorStudentsReport = async (req, res) => {
   try {
-    const tutor = await Tutor.findById(req.params.id);
+    const tutor = await Tutor.findById(req.params.id)
+      .populate({
+        path: 'students',
+        select: 'name fatherName contact gender medium schoolInfo isOrphan assignedTutor assignedCenter'
+      });
     
     if (!tutor) {
       return res.status(404).json({ message: 'Tutor not found' });
@@ -506,12 +543,7 @@ export const getTutorStudentsReport = async (req, res) => {
       tutorId: tutor._id,
       name: tutor.name,
       location: tutor.location,
-      students: {
-        total: 0,
-        active: 0,
-        bySubject: [],
-        byClass: []
-      }
+      students: tutor.students
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

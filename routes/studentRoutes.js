@@ -14,7 +14,8 @@ import {
   getStudentProgress,
   changeAssignedTutor,
   getStudentByCenter,
-  markDailyAttendance
+  markDailyAttendance,
+  getStudentFullReport
 } from '../controllers/studentController.js';
 
 const router = express.Router();
@@ -44,6 +45,15 @@ const dateRangeValidation = [
   body('endDate').isISO8601().withMessage('Invalid end date')
 ];
 
+// Full report validation
+const fullReportValidation = [
+  body('fromMonth').notEmpty().withMessage('fromMonth is required'),
+  body('toMonth').notEmpty().withMessage('toMonth is required'),
+  body('year').isInt({ min: 2000, max: 2100 }).withMessage('Invalid year'),
+  body('studentIds').isArray({ min: 1 }).withMessage('studentIds must be a non-empty array'),
+  body('studentIds.*').isMongoId().withMessage('Each studentId must be a valid MongoDB ID')
+];
+
 router.route('/')
   .get(protect, getStudents)
   .post(protect, studentValidation, validateRequest, createStudent);
@@ -52,10 +62,16 @@ router.get('/getByCenter/:centerId', protect, getStudentByCenter);
 
 router.post('/markDailyAttendance',protect,markDailyAttendance)
 
+// Full report endpoint
+router.post('/FullReport/students', protect, adminOnly, fullReportValidation, validateRequest, getStudentFullReport);
+
 router.route('/:id')
   .get(protect, getStudent)
-  .put(protect, studentValidation, validateRequest, updateStudent,changeAssignedTutor)
+  .put(protect, studentValidation, validateRequest, updateStudent)
   .delete(protect, deleteStudent);
+
+// Change assigned tutor endpoint
+router.post('/change-assigned-tutor', protect, changeAssignedTutor);
 
 router.route('/:id/attendance')
   .post(protect, attendanceValidation, validateRequest, markAttendance);
@@ -63,6 +79,6 @@ router.route('/:id/attendance')
 // Report routes
 router.get('/:id/attendance-report', protect, dateRangeValidation, validateRequest, getStudentAttendanceReport);
 router.get('/reports/monthly', protect, dateRangeValidation, validateRequest, getMonthlyAttendanceReport);
-router.get('/:id/progress', protect, getStudentProgress);
+// router.get('/:id/progress', protect, getStudentProgress);
 
 export default router;
