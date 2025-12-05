@@ -1,1 +1,0 @@
-import StudentSubject from '../models/StudentSubject.js';

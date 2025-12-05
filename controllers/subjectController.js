@@ -88,26 +88,6 @@ export const addStudentsToSubject = async (req, res, next) => {
   }
 };
 
-export const removeStudentFromSubject= async (req, res) => {
-    try {
-        const { id } = req.params; // Subject ID
-        const { studentIds } = req.body; // Student ID to be removed
-        if (!studentIds || !Array.isArray(studentIds)) {
-            return res.status(400).json("studentIds(array) is required");
-        }
-        const subject = await Subject.findById(id);
-        if (!subject) {
-            return res.status(404).json("Subject not found");
-        }
-        // Remove students
-        subject.students = subject.students.filter(studentId => !studentIds.includes(studentId.toString()));
-        await subject.save();
-        res.status(200).json("Students removed from subject successfully");
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
 export const createStudentSubjectRecord = async (req, res) => {
   try {
     const studentIds = req.body.studentIds;
@@ -129,6 +109,26 @@ export const createStudentSubjectRecord = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+};
+
+export const removeStudentFromSubject= async (req, res) => {
+    try {
+        const { id } = req.params; // Subject ID
+        const { studentIds } = req.body; // Student ID to be removed
+        if (!studentIds || !Array.isArray(studentIds)) {
+            return res.status(400).json("studentIds(array) is required");
+        }
+        const subject = await Subject.findById(id);
+        if (!subject) {
+            return res.status(404).json("Subject not found");
+        }
+        // Remove students
+        subject.students = subject.students.filter(studentId => !studentIds.includes(studentId.toString()));
+        await subject.save();
+        res.status(200).json("Students removed from subject successfully");
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 };
 
 // Add tutors to a subject
