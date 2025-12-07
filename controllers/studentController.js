@@ -129,11 +129,17 @@ export const createStudent = async (req, res) => {
       gender,
       medium,
       aadharNumber,
+      homeAddress,
       assignedCenter,
       remarks
     } = req.body;
 
     console.log('Received student data:', req.body); // Debug log
+
+    // Validate required homeAddress
+    if (!homeAddress) {
+      return res.status(400).json({ message: 'Home address is required' });
+    }
 
     // Check if center exists
     const center = await Center.findById(assignedCenter);
@@ -180,6 +186,7 @@ export const createStudent = async (req, res) => {
       gender,
       medium,
       aadharNumber,
+      homeAddress,
       assignedCenter,
       assignedTutor,
       remarks,
