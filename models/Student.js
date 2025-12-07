@@ -19,6 +19,12 @@ const studentSchema = new mongoose.Schema({
     required: [true, 'Please add a contact number'],
     match: [/^[0-9]{10}$/, 'Please add a valid phone number']
   },
+  homeAddress: {
+    type: String,
+    // required: [true, 'Please add home address'],
+    trim: true,
+    maxlength: 200
+  },
   isOrphan: {
     type: Boolean,
     default: false
