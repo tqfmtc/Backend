@@ -41,6 +41,11 @@ const studentSchema = new mongoose.Schema({
     name: String,
     class: String
   },
+  schoolAddress: {
+    type: String,
+    trim: true,
+    maxlength: 200
+  },
   gender: {
     type: String,
     enum: ['Male', 'Female'],
