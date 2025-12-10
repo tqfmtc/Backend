@@ -1,5 +1,6 @@
 import express from 'express';
 import Admin from '../models/Admin.js';
+import AdminActivity from '../models/AdminActivity.js';
 import { auth, adminOnly } from '../middleware/auth.js';
 import { createActivityLogger, logAdminActivity } from '../middleware/activityLogger.js';
 
@@ -84,6 +85,9 @@ router.delete('/:id', auth, adminOnly, async (req, res) => {
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found' });
     }
+    
+    // Delete all activities of this admin first
+    await AdminActivity.deleteMany({ adminId: req.params.id });
     
     // Store admin name for activity logging
     req.deletedItemName = admin.name;
