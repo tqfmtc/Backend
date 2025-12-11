@@ -32,6 +32,55 @@ const adminSchema = new mongoose.Schema({
     type: String,
     default: 'admin'
   },
+  // NEW
+  superAdmin: {
+    type: Boolean,
+    default: false
+  },
+
+  // NEW - each screen has read & write
+  permissions: {
+    dashboard: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    tutors: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    hadiyaCenters: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    students: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    tutorAttendance: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    guestTutors: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    announcements: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    supervisors: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    subjects: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    admins: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now

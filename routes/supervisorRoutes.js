@@ -1,13 +1,13 @@
 import express from 'express';
 import Supervisor from '../models/Supervisor.js';
-import { auth, adminOnly } from '../middleware/auth.js';
+import { auth, adminOnly, checkPermission } from '../middleware/auth.js';
 import { createActivityLogger, logAdminActivity } from '../middleware/activityLogger.js';
 
 
 const router = express.Router();
 
 // GET /api/supervisor - Get all supervisors (admin only)
-router.get('/', auth, adminOnly, async (req, res) => {
+router.get('/', auth, checkPermission('supervisors', 'read'), async (req, res) => {
   try {
     const supervisors = await Supervisor.find().select('-password');
     res.json(supervisors);
@@ -17,7 +17,7 @@ router.get('/', auth, adminOnly, async (req, res) => {
 });
 
 // POST /api/supervisor - Create new supervisor (admin only)
-router.post('/', auth, adminOnly, createActivityLogger('CREATE_SUPERVISOR', 'Supervisor'), async (req, res) => {
+router.post('/', auth, checkPermission('supervisors', 'write'), createActivityLogger('CREATE_SUPERVISOR', 'Supervisor'), async (req, res) => {
   try {
     const { name, email, phone, password, assignedCenters } = req.body;
     
@@ -53,7 +53,7 @@ router.post('/', auth, adminOnly, createActivityLogger('CREATE_SUPERVISOR', 'Sup
 });
 
 // PUT /api/supervisor/:id - Update supervisor (admin only)
-router.put('/:id', auth, adminOnly, createActivityLogger('UPDATE_SUPERVISOR', 'Supervisor'), async (req, res) => {
+router.put('/:id', auth, checkPermission('supervisors', 'write'), createActivityLogger('UPDATE_SUPERVISOR', 'Supervisor'), async (req, res) => {
   try {
     const { name, email, phone, password, assignedCenters } = req.body;
     const updateData = {};
@@ -81,7 +81,7 @@ router.put('/:id', auth, adminOnly, createActivityLogger('UPDATE_SUPERVISOR', 'S
 });
 
 // DELETE /api/supervisor/:id - Delete supervisor (admin only)
-router.delete('/:id', auth, adminOnly, async (req, res) => {
+router.delete('/:id', auth, checkPermission('supervisors', 'write'), async (req, res) => {
   try {
     const supervisor = await Supervisor.findById(req.params.id);
     if (!supervisor) {

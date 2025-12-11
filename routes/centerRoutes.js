@@ -1,7 +1,7 @@
 import express from 'express';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
-import { protect, adminOnly, supervisorOnly, auth } from '../middleware/auth.js';
+import { protect, adminOnly, supervisorOnly, auth, checkPermission } from '../middleware/auth.js';
 import { createActivityLogger, logAdminActivity } from '../middleware/activityLogger.js';
 import multer from 'multer';
 import Center from '../models/Center.js';
@@ -65,10 +65,10 @@ const locationCheckValidation = [
 ];
 
 router.route('/')
-  .get(protect, getCenters)
-  .post(protect, adminOnly, createActivityLogger('CREATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, createCenter);
+  .get(protect, checkPermission('hadiyaCenters', 'read'), getCenters)
+  .post(protect, checkPermission('hadiyaCenters', 'write'), createActivityLogger('CREATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, createCenter);
 
-router.get('/comments',  async (req, res) => {
+router.get('/comments', protect, checkPermission('hadiyaCenters', 'read'), async (req, res) => {
   console.log('enter center comments');
   try{
     console.log('Fetching all center comments');
@@ -85,9 +85,9 @@ router.get('/comments',  async (req, res) => {
 });
 
 router.route('/:id')
-  .get(protect, getCenter)
-  .put(protect, adminOnly, createActivityLogger('UPDATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, updateCenter)
-  .delete(protect, adminOnly, createActivityLogger('DELETE_CENTER', 'Center'), deleteCenter);
+  .get(protect, checkPermission('hadiyaCenters', 'read'), getCenter)
+  .put(protect, checkPermission('hadiyaCenters', 'write'), createActivityLogger('UPDATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, updateCenter)
+  .delete(protect, checkPermission('hadiyaCenters', 'write'), createActivityLogger('DELETE_CENTER', 'Center'), deleteCenter);
 
 router.post('/check-location', protect, locationCheckValidation, validateRequest, checkTutorLocation);
 
