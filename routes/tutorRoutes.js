@@ -2,7 +2,7 @@ import express from 'express';
 import upload from '../multer.js';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
-import { protect, adminOnly } from '../middleware/auth.js';
+import { protect, adminOnly, checkPermission } from '../middleware/auth.js';
 import { createActivityLogger } from '../middleware/activityLogger.js';
 import {
   getTutors,
@@ -134,20 +134,20 @@ router.use(protect);
 
 // Routes that require admin access
 router.route('/')
-  .get(getTutors)
-  .post(adminOnly, createActivityLogger('CREATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), tutorValidation, validateRequest, createTutor);
+  .get(checkPermission('tutors', 'read'), getTutors)
+  .post(checkPermission('tutors', 'write'), createActivityLogger('CREATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), tutorValidation, validateRequest, createTutor);
 
 router.route('/:id')
-  .get(getTutor)
-  .put(adminOnly, createActivityLogger('UPDATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
-  .delete(adminOnly, createActivityLogger('DELETE_TUTOR', 'Tutor'), deleteTutor);
+  .get(checkPermission('tutors', 'read'), getTutor)
+  .put(checkPermission('tutors', 'write'), createActivityLogger('UPDATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
+  .delete(checkPermission('tutors', 'write'), createActivityLogger('DELETE_TUTOR', 'Tutor'), deleteTutor);
 
 // Get tutors by center
-router.get('/center/:centerId', getTutorsByCenter);
+router.get('/center/:centerId', checkPermission('tutors', 'read'), getTutorsByCenter);
 
 // Report routes
-router.get('/:id/attendance', getTutorAttendanceReport);
-router.get('/:id/performance', getTutorPerformanceReport);
+router.get('/:id/attendance', checkPermission('tutors', 'read'), getTutorAttendanceReport);
+router.get('/:id/performance', checkPermission('tutors', 'read'), getTutorPerformanceReport);
 router.get('/:id/students', getTutorStudentsReport);
 
 // Attendance submission route

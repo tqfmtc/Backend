@@ -1,5 +1,5 @@
 import express from 'express';
-import { auth, adminOnly } from '../middleware/auth.js';
+import { auth, adminOnly, checkPermission } from '../middleware/auth.js';
 import {
   getActiveAnnouncements,
   createAnnouncement,
@@ -14,10 +14,10 @@ const router = express.Router();
 router.get('/', getActiveAnnouncements);
 
 // Admin-only CRUD
-router.use(auth, adminOnly);
-router.post('/', createAnnouncement);
-router.get('/all', getAllAnnouncements);
-router.put('/:id', updateAnnouncement);
-router.delete('/:id', deleteAnnouncement);
+router.use(auth);
+router.post('/', checkPermission('announcements', 'write'), createAnnouncement);
+router.get('/all', checkPermission('announcements', 'read'), getAllAnnouncements);
+router.put('/:id', checkPermission('announcements', 'write'), updateAnnouncement);
+router.delete('/:id', checkPermission('announcements', 'write'), deleteAnnouncement);
 
 export default router;
