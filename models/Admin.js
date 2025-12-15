@@ -48,7 +48,11 @@ const adminSchema = new mongoose.Schema({
       read: { type: Boolean, default: false },
       write: { type: Boolean, default: false }
     },
-    hadiyaCenters: {
+    hadiya: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    centers: {
       read: { type: Boolean, default: false },
       write: { type: Boolean, default: false }
     },

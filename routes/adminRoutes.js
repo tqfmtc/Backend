@@ -23,7 +23,7 @@ const validateAdminPermissions = (permissions) => {
   // If trying to give write access to admins section
   if (permissions.admins && permissions.admins.write) {
     const requiredSections = [
-      'dashboard', 'tutors', 'hadiyaCenters', 'students', 
+      'dashboard', 'tutors', 'hadiya', 'centers', 'students', 
       'tutorAttendance', 'guestTutors', 'announcements', 
       'supervisors', 'subjects'
     ];

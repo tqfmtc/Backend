@@ -65,10 +65,10 @@ const locationCheckValidation = [
 ];
 
 router.route('/')
-  .get(protect, checkPermission('hadiyaCenters', 'read'), getCenters)
-  .post(protect, checkPermission('hadiyaCenters', 'write'), createActivityLogger('CREATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, createCenter);
+  .get(protect, checkPermission('centers', 'read'), getCenters)
+  .post(protect, checkPermission('centers', 'write'), createActivityLogger('CREATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, createCenter);
 
-router.get('/comments', protect, checkPermission('hadiyaCenters', 'read'), async (req, res) => {
+router.get('/comments', protect, checkPermission('centers', 'read'), async (req, res) => {
   console.log('enter center comments');
   try{
     console.log('Fetching all center comments');
@@ -85,9 +85,9 @@ router.get('/comments', protect, checkPermission('hadiyaCenters', 'read'), async
 });
 
 router.route('/:id')
-  .get(protect, checkPermission('hadiyaCenters', 'read'), getCenter)
-  .put(protect, checkPermission('hadiyaCenters', 'write'), createActivityLogger('UPDATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, updateCenter)
-  .delete(protect, checkPermission('hadiyaCenters', 'write'), createActivityLogger('DELETE_CENTER', 'Center'), deleteCenter);
+  .get(protect, checkPermission('centers', 'read'), getCenter)
+  .put(protect, checkPermission('centers', 'write'), createActivityLogger('UPDATE_CENTER', 'Center'), upload.array('images', 5), centerValidation, validateRequest, updateCenter)
+  .delete(protect, checkPermission('centers', 'write'), createActivityLogger('DELETE_CENTER', 'Center'), deleteCenter);
 
 router.post('/check-location', protect, locationCheckValidation, validateRequest, checkTutorLocation);
 
