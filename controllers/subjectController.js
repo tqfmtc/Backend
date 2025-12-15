@@ -165,7 +165,11 @@ export const addTutorsToSubject = async (req, res) => {
 // Get all subjects
 export const getAllSubjects = async (req, res) => {
     try {
-        const subjects = await Subject.find().populate('students').populate('tutors');
+        // Use lean() and limit fields to speed up query
+        const subjects = await Subject.find()
+            .select('name description')
+            .lean();
+        
         res.status(200).json(subjects);
     } catch (error) {
         res.status(500).json({ message: error.message });

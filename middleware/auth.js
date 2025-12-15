@@ -66,7 +66,6 @@ export const checkPermission = (resource, action) => {
     if (req.user.superAdmin) {
       return next();
     }
-
     // Check specific permission
     // resource: e.g., 'tutors', 'students'
     // action: 'read' or 'write'

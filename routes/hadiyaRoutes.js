@@ -6,11 +6,11 @@ import { protect, adminOnly, checkPermission } from '../middleware/auth.js'; // 
 // @route   POST /api/hadiya/record
 // @desc    Record a Hadiya payment for a tutor
 // @access  Private/Admin
-router.post('/record', protect, checkPermission('hadiyaCenters', 'write'), recordHadiyaPayment);
+router.post('/record', protect, checkPermission('hadiya', 'write'), recordHadiyaPayment);
 
 // @route   GET /api/hadiya/report
 // @desc    Get Hadiya payment report
 // @access  Private/Admin
-router.get('/report', protect, checkPermission('hadiyaCenters', 'read'), getHadiyaReport);
+router.get('/report', protect, checkPermission('hadiya', 'read'), getHadiyaReport);
 
 export default router;
