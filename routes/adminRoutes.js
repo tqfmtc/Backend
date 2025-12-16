@@ -3,6 +3,7 @@ import Admin from '../models/Admin.js';
 import AdminActivity from '../models/AdminActivity.js';
 import { auth, adminOnly, checkPermission } from '../middleware/auth.js';
 import { createActivityLogger, logAdminActivity } from '../middleware/activityLogger.js';
+import { sendAdminDeletionEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -147,24 +148,48 @@ router.delete('/:id', auth, checkPermission('admins', 'write'), async (req, res)
       return res.status(404).json({ message: 'Admin not found' });
     }
     
+    // Get the admin who is performing the delete operation
+    const deletingAdmin = req.user;
+    const deletionDate = new Date().toLocaleString('en-US', { 
+      dateStyle: 'full', 
+      timeStyle: 'short' 
+    });
+    
     // Delete all activities of this admin first
     await AdminActivity.deleteMany({ adminId: req.params.id });
     
-    // Store admin name for activity logging
-    req.deletedItemName = admin.name;
+    // Store admin info for email and activity logging
+    const deletedAdminEmail = admin.email;
+    const deletedAdminName = admin.name;
     
     await Admin.findByIdAndDelete(req.params.id);
     
-    // Log the activity manually since we need the admin info before deletion
+    // Log the activity
     await logAdminActivity(
       req.user,
       'DELETE_ADMIN',
       'Admin',
       req.params.id,
-      admin.name,
-      { deletedAdmin: { name: admin.name, email: admin.email } },
+      deletedAdminName,
+      { deletedAdmin: { name: deletedAdminName, email: deletedAdminEmail } },
       req
     );
+    
+    // Send email notification to the deleted admin
+    try {
+      await sendAdminDeletionEmail({
+        to: deletedAdminEmail,
+        deletedAdminName: deletedAdminName,
+        deletionDate: deletionDate,
+        deletedByName: deletingAdmin.name,
+        deletedByEmail: deletingAdmin.email,
+        deletedByPhone: deletingAdmin.phone
+      });
+      console.log(`✅ Admin deletion email sent to ${deletedAdminEmail}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send admin deletion email:', emailError.message);
+      // Don't fail the deletion if email fails
+    }
     
     res.json({ message: 'Admin deleted successfully' });
   } catch (err) {

@@ -13,6 +13,7 @@ import {
   getMonthlyAttendanceReport,
   getStudentProgress,
   changeAssignedTutor,
+  changeAssignedCenter,
   getStudentByCenter,
   markDailyAttendance,
   getStudentFullReport
@@ -72,6 +73,9 @@ router.route('/:id')
 
 // Change assigned tutor endpoint
 router.post('/change-assigned-tutor', protect, checkPermission('students', 'write'), changeAssignedTutor);
+
+// Change assigned center endpoint
+router.put('/change-center/:studentId', protect, checkPermission('students', 'write'), changeAssignedCenter);
 
 router.route('/:id/attendance')
   .post(protect, checkPermission('students', 'write'), attendanceValidation, validateRequest, markAttendance);

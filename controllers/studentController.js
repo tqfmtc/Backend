@@ -325,6 +325,66 @@ export const changeAssignedTutor = async (req, res) => {
   }
 };
 
+// @desc    Change assigned center and tutor of a student
+// @route   PUT /api/students/:id/change-center
+// @access  Private/Admin
+export const changeAssignedCenter = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { assignedCenterId, assignedTutorId } = req.body;
+
+    // Validate required fields
+    if (!assignedCenterId || !assignedTutorId) {
+      return res.status(400).json({ 
+        message: 'Both assignedCenterId and assignedTutorId are required' 
+      });
+    }
+
+    // Find the student
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // Verify the new center exists
+    const newCenter = await Center.findById(assignedCenterId);
+    if (!newCenter) {
+      return res.status(404).json({ message: 'Center not found' });
+    }
+
+    // Verify the tutor exists
+    const tutor = await Tutor.findById(assignedTutorId);
+    if (!tutor) {
+      return res.status(404).json({ message: 'Tutor not found' });
+    }
+
+    // Validate that the tutor belongs to the specified center
+    if (tutor.assignedCenter.toString() !== assignedCenterId) {
+      return res.status(400).json({ 
+        message: 'The specified tutor does not belong to the selected center. Please select a tutor assigned to this center.' 
+      });
+    }
+
+    // Update student's assigned center and tutor
+    student.assignedCenter = assignedCenterId;
+    student.assignedTutor = assignedTutorId;
+    await student.save();
+
+    // Populate the response with center and tutor details
+    const updatedStudent = await Student.findById(student._id)
+      .populate('assignedCenter', 'name location')
+      .populate('assignedTutor', 'name contact email');
+
+    res.json({ 
+      message: 'Student center and tutor updated successfully', 
+      student: updatedStudent 
+    });
+  } catch (error) {
+    console.error('Error in changeAssignedCenter:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Delete student
 // @route   DELETE /api/students/:id
 // @access  Private/Admin
