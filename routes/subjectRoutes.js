@@ -1,5 +1,5 @@
 import express from 'express';
-import {addSubject, addStudentsToSubject,createStudentSubjectRecord,removeStudentFromSubject, addTutorsToSubject, getAllSubjects, getSubjectById, updateSubject, deleteSubject,getByCenter} from '../controllers/subjectController.js';
+import {addSubject, addStudentsToSubject,createStudentSubjectRecord,removeStudentFromSubject, addTutorsToSubject, getAllSubjects, getSubjectById, updateSubject, deleteSubject, toggleSubjectStatus, getByCenter} from '../controllers/subjectController.js';
 import { auth, adminOnly, checkPermission } from '../middleware/auth.js';
 import { createActivityLogger } from '../middleware/activityLogger.js';
 
@@ -27,6 +27,9 @@ router.get('/:id', auth, checkPermission('subjects', 'read'), getSubjectById);
 
 // PUT /api/subjects/:id - Update subject (admin only)
 router.put('/:id', auth, checkPermission('subjects', 'write'), createActivityLogger('UPDATE_SUBJECT', 'StudentSubject'), updateSubject);
+
+// PATCH /api/subjects/:id/toggle-status - Toggle subject active status (admin only)
+router.patch('/:id/toggle-status', auth, checkPermission('subjects', 'write'), createActivityLogger('TOGGLE_SUBJECT_STATUS', 'Subject'), toggleSubjectStatus);
 
 // DELETE /api/subjects/:id - Delete subject (admin only)
 router.delete('/:id', auth, checkPermission('subjects', 'write'), createActivityLogger('DELETE_SUBJECT', 'StudentSubject'), deleteSubject);
