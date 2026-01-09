@@ -1,6 +1,8 @@
 import Student from '../models/Student.js';
 import Center from '../models/Center.js';
 import Tutor from '../models/Tutor.js';
+import Subject from '../models/Subject.js';
+import StudentSubject from '../models/StudentSubject.js';
 
 // @desc    Get all students
 // @route   GET /api/students
@@ -31,10 +33,10 @@ export const getStudents = async (req, res) => {
     path: 'subjects',                  // populate StudentSubject
     populate: {                        // nested populate
       path: 'subject',                 // populate Subject inside StudentSubject
-      select: 'name'                   // only include the name field
+      select: 'subjectName'            // only include the subjectName field
     }
   });
-    
+    // console.log(students);
     res.json(students);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -71,7 +73,7 @@ export const getStudent = async (req, res) => {
         path: 'subjects',
         populate: {
           path: 'subject',
-          select: 'name',
+          select: 'subjectName',
         },
       });
 
@@ -203,10 +205,48 @@ export const createStudent = async (req, res) => {
     // Add student to center's students array (use $addToSet for safety)
     await Center.findByIdAndUpdate(student.assignedCenter, { $addToSet: { students: student._id } });
 
+    // Handle subjects if provided
+    if (req.body.subjects && Array.isArray(req.body.subjects) && req.body.subjects.length > 0) {
+      const studentSubjectRecords = [];
+      
+      for (const subjectId of req.body.subjects) {
+        // Verify subject exists
+        const subject = await Subject.findById(subjectId);
+        if (subject) {
+          // Create StudentSubject record
+          const studentSubjectRecord = await StudentSubject.create({
+            student: student._id,
+            subject: subjectId,
+            marksPercentage: []
+          });
+          
+          studentSubjectRecords.push(studentSubjectRecord._id);
+          
+          // Add student to subject's students array
+          await Subject.findByIdAndUpdate(subjectId, { 
+            $addToSet: { students: student._id } 
+          });
+        }
+      }
+      
+      // Add StudentSubject records to student's subjects array
+      if (studentSubjectRecords.length > 0) {
+        student.subjects = studentSubjectRecords;
+        await student.save();
+      }
+    }
+
     // Populate the response with center details
     const populatedStudent = await Student.findById(student._id)
       .populate('assignedCenter', 'name location')
-      .populate('assignedTutor', 'name contact email');
+      .populate('assignedTutor', 'name contact email')
+      .populate({
+        path: 'subjects',
+        populate: {
+          path: 'subject',
+          select: 'subjectName'
+        }
+      });
 
     res.status(201).json(populatedStudent);
   } catch (error) {
@@ -287,11 +327,69 @@ export const updateStudent = async (req, res) => {
       req.body.status = 'active';
     }
 
+    // Handle subjects update if provided
+    if (req.body.subjects && Array.isArray(req.body.subjects)) {
+      // Get existing StudentSubject records for this student
+      const existingRecords = await StudentSubject.find({ student: student._id });
+      const existingSubjectIds = existingRecords.map(record => record.subject.toString());
+      const newSubjectIds = req.body.subjects;
+
+      // Find subjects to add and remove
+      const subjectsToAdd = newSubjectIds.filter(id => !existingSubjectIds.includes(id));
+      const subjectsToRemove = existingSubjectIds.filter(id => !newSubjectIds.includes(id));
+
+      // Remove old subjects
+      for (const subjectId of subjectsToRemove) {
+        // Remove StudentSubject record
+        const recordToRemove = existingRecords.find(r => r.subject.toString() === subjectId);
+        if (recordToRemove) {
+          await StudentSubject.findByIdAndDelete(recordToRemove._id);
+          // Remove from student's subjects array
+          student.subjects = student.subjects.filter(id => id.toString() !== recordToRemove._id.toString());
+        }
+        // Remove student from subject's students array
+        await Subject.findByIdAndUpdate(subjectId, { 
+          $pull: { students: student._id } 
+        });
+      }
+
+      // Add new subjects
+      for (const subjectId of subjectsToAdd) {
+        const subject = await Subject.findById(subjectId);
+        if (subject) {
+          // Create StudentSubject record
+          const studentSubjectRecord = await StudentSubject.create({
+            student: student._id,
+            subject: subjectId,
+            marksPercentage: []
+          });
+          
+          // Add to student's subjects array
+          student.subjects.push(studentSubjectRecord._id);
+          
+          // Add student to subject's students array
+          await Subject.findByIdAndUpdate(subjectId, { 
+            $addToSet: { students: student._id } 
+          });
+        }
+      }
+      
+      await student.save();
+    }
+
     const updatedStudent = await Student.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
-    ).populate('assignedCenter', 'name location').populate('assignedTutor', 'name contact email');
+    ).populate('assignedCenter', 'name location')
+     .populate('assignedTutor', 'name contact email')
+     .populate({
+        path: 'subjects',
+        populate: {
+          path: 'subject',
+          select: 'subjectName'
+        }
+      });
 
     res.json(updatedStudent);
   } catch (error) {
