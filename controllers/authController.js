@@ -60,6 +60,8 @@ export const adminLogin = async (req, res) => {
       name: admin.name,
       email: admin.email,
       role: admin.role,
+      superAdmin: admin.superAdmin,
+      permissions: admin.permissions,
       token: generateToken(admin._id, 'admin')
     });
   } catch (error) {

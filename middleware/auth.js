@@ -54,6 +54,41 @@ export const adminOnly = (req, res, next) => {
   next();
 };
 
+// Middleware to check admin permissions
+export const checkPermission = (resource, action) => {
+  return (req, res, next) => {
+    // If user is a tutor, allow them to pass through
+    if (req.role === 'tutor') {
+      return next();
+    }
+
+    // Ensure user is an admin
+    if (req.role !== 'admin' || !req.user) {
+      return res.status(403).json({ message: 'Not authorized as an admin' });
+    }
+
+    // Super admin has full access
+    if (req.user.superAdmin) {
+      return next();
+    }
+    
+    // Check specific permission for regular admins
+    // resource: e.g., 'tutors', 'students'
+    // action: 'read' or 'write'
+    if (
+      req.user.permissions &&
+      req.user.permissions[resource] &&
+      req.user.permissions[resource][action]
+    ) {
+      return next();
+    }
+
+    return res.status(403).json({ 
+      message: `Not authorized: Missing ${action} permission for ${resource}` 
+    });
+  };
+};
+
 export const supervisorOnly = (req, res, next) => {
   if (req.role !== 'supervisor') {
     return res.status(403).json({ message: 'Access denied. Supervisor only.' });

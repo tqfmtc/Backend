@@ -17,18 +17,19 @@ import mongoose from 'mongoose';
 // @access  Private/Admin
 export const getTutors = async (req, res) => {
   try {
+    // Add lean() for faster queries and limit populated fields
     const tutors = await Tutor.find()
-      .populate('assignedCenter', 'name location').populate({
-        path: 'students',
-        match: { status: 'active' }, // Only populate active students
-        select: 'name'
-      })
-      .select('-password');
-    const tutorsWithCenterName = tutors.map(tutor => {
-      const tutorObj = tutor.toObject();
-      tutorObj.centerName = tutorObj.assignedCenter?.name || "Unknown Center";
-      return tutorObj;
-    });
+      .populate('assignedCenter', 'name location')
+      .select('-password -documents -__v')
+      .lean(); // Convert to plain JS objects (faster)
+    
+    // Map center names without additional student population
+    const tutorsWithCenterName = tutors.map(tutor => ({
+      ...tutor,
+      centerName: tutor.assignedCenter?.name || "Unknown Center",
+      studentCount: tutor.students?.length || 0 // Just count, don't populate full data
+    }));
+    
     res.json(tutorsWithCenterName);
   } catch (error) {
     res.status(500).json({ message: error.message });

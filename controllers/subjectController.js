@@ -165,7 +165,13 @@ export const addTutorsToSubject = async (req, res) => {
 // Get all subjects
 export const getAllSubjects = async (req, res) => {
     try {
-        const subjects = await Subject.find().populate('students').populate('tutors');
+        // Fetch all subjects with populated students and tutors
+        const subjects = await Subject.find()
+            .populate('students', 'name email')
+            .populate('tutors', 'name email')
+            .select('subjectName students tutors isActive createdAt')
+            .lean();
+        
         res.status(200).json(subjects);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -205,6 +211,30 @@ export const getSubjectById = async (req, res) => {
             return res.status(404).json("Subject not found");
         }
         res.status(200).json(subject);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Toggle subject active status
+export const toggleSubjectStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const subject = await Subject.findById(id);
+        
+        if (!subject) {
+            return res.status(404).json({ message: "Subject not found" });
+        }
+        
+        // Toggle the isActive status
+        subject.isActive = !subject.isActive;
+        await subject.save();
+        
+        const status = subject.isActive ? 'activated' : 'deactivated';
+        res.status(200).json({ 
+            message: `Subject ${status} successfully`,
+            subject 
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

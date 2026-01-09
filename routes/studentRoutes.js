@@ -1,7 +1,7 @@
 import express from 'express';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
-import { protect, adminOnly } from '../middleware/auth.js';
+import { protect, adminOnly, checkPermission } from '../middleware/auth.js';
 import {
   getStudents,
   getStudent,
@@ -13,6 +13,7 @@ import {
   getMonthlyAttendanceReport,
   getStudentProgress,
   changeAssignedTutor,
+  changeAssignedCenter,
   getStudentByCenter,
   markDailyAttendance,
   getStudentFullReport
@@ -55,30 +56,33 @@ const fullReportValidation = [
 ];
 
 router.route('/')
-  .get(protect, getStudents)
-  .post(protect, studentValidation, validateRequest, createStudent);
+  .get(protect, checkPermission('students', 'read'), getStudents)
+  .post(protect, checkPermission('students', 'write'), studentValidation, validateRequest, createStudent);
 
-router.get('/getByCenter/:centerId', protect, getStudentByCenter);
+router.get('/getByCenter/:centerId', protect, checkPermission('students', 'read'), getStudentByCenter);
 
-router.post('/markDailyAttendance',protect,markDailyAttendance)
+router.post('/markDailyAttendance', protect, checkPermission('students', 'write'), markDailyAttendance)
 
 // Full report endpoint
-router.post('/FullReport/students', protect, adminOnly, fullReportValidation, validateRequest, getStudentFullReport);
+router.post('/FullReport/students', protect, checkPermission('students', 'read'), fullReportValidation, validateRequest, getStudentFullReport);
 
 router.route('/:id')
-  .get(protect, getStudent)
-  .put(protect, studentValidation, validateRequest, updateStudent)
-  .delete(protect, deleteStudent);
+  .get(protect, checkPermission('students', 'read'), getStudent)
+  .put(protect, checkPermission('students', 'write'), studentValidation, validateRequest, updateStudent)
+  .delete(protect, checkPermission('students', 'write'), deleteStudent);
 
 // Change assigned tutor endpoint
-router.post('/change-assigned-tutor', protect, changeAssignedTutor);
+router.post('/change-assigned-tutor', protect, checkPermission('students', 'write'), changeAssignedTutor);
+
+// Change assigned center endpoint
+router.put('/change-center/:studentId', protect, checkPermission('students', 'write'), changeAssignedCenter);
 
 router.route('/:id/attendance')
-  .post(protect, attendanceValidation, validateRequest, markAttendance);
+  .post(protect, checkPermission('students', 'write'), attendanceValidation, validateRequest, markAttendance);
 
 // Report routes
-router.get('/:id/attendance-report', protect, dateRangeValidation, validateRequest, getStudentAttendanceReport);
-router.get('/reports/monthly', protect, dateRangeValidation, validateRequest, getMonthlyAttendanceReport);
+router.get('/:id/attendance-report', protect, checkPermission('students', 'read'), dateRangeValidation, validateRequest, getStudentAttendanceReport);
+router.get('/reports/monthly', protect, checkPermission('students', 'read'), dateRangeValidation, validateRequest, getMonthlyAttendanceReport);
 // router.get('/:id/progress', protect, getStudentProgress);
 
 export default router;
