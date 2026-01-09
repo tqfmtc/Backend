@@ -1,13 +1,14 @@
 import express from 'express';
 import Admin from '../models/Admin.js';
 import AdminActivity from '../models/AdminActivity.js';
-import { auth, adminOnly } from '../middleware/auth.js';
+import { auth, adminOnly, checkPermission } from '../middleware/auth.js';
 import { createActivityLogger, logAdminActivity } from '../middleware/activityLogger.js';
+import { sendAdminDeletionEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
 // GET /api/admin - Get all admins (admin only)
-router.get('/', auth, adminOnly, async (req, res) => {
+router.get('/', auth, checkPermission('admins', 'read'), async (req, res) => {
   try {
     const admins = await Admin.find().select('-password');
     res.json(admins);
@@ -16,11 +17,50 @@ router.get('/', auth, adminOnly, async (req, res) => {
   }
 });
 
-// POST /api/admin - Create new admin (admin only)
-router.post('/', auth, adminOnly, createActivityLogger('CREATE_ADMIN', 'Admin'), async (req, res) => {
-  try {
-    const { name, email, phone, password } = req.body;
+// Helper to validate admin write permissions
+const validateAdminPermissions = (permissions) => {
+  if (!permissions) return { isValid: true, isSuperAdmin: false };
+  
+  // If trying to give write access to admins section
+  if (permissions.admins && permissions.admins.write) {
+    const requiredSections = [
+      'dashboard', 'tutors', 'hadiya', 'centers', 'students', 
+      'tutorAttendance', 'guestTutors', 'announcements', 
+      'supervisors', 'subjects'
+    ];
+
+    // Check if all other sections have both read and write access
+    const hasAllAccess = requiredSections.every(section => 
+      permissions[section] && 
+      permissions[section].read === true && 
+      permissions[section].write === true
+    );
+
+    if (!hasAllAccess) {
+      return { 
+        isValid: false, 
+        error: 'Cannot grant Admin Write permission unless all other permissions (Read & Write) are granted.' 
+      };
+    }
     
+    // If all access is present, they become superAdmin
+    return { isValid: true, isSuperAdmin: true };
+  }
+
+  return { isValid: true, isSuperAdmin: false };
+};
+
+// POST /api/admin - Create new admin (admin only)
+router.post('/', auth, checkPermission('admins', 'write'), createActivityLogger('CREATE_ADMIN', 'Admin'), async (req, res) => {
+  try {
+    const { name, email, phone, password, permissions } = req.body;
+    
+    // Validate permissions logic
+    const permCheck = validateAdminPermissions(permissions);
+    if (!permCheck.isValid) {
+      return res.status(400).json({ message: permCheck.error });
+    }
+
     // Check if admin already exists
     const existingAdmin = await Admin.findOne({ 
       $or: [{ email }, { phone }] 
@@ -36,7 +76,9 @@ router.post('/', auth, adminOnly, createActivityLogger('CREATE_ADMIN', 'Admin'),
       name,
       email,
       phone,
-      password
+      password,
+      superAdmin: permCheck.isSuperAdmin, // Auto-set based on permissions
+      permissions: permissions || {}
     });
 
     await admin.save();
@@ -52,11 +94,31 @@ router.post('/', auth, adminOnly, createActivityLogger('CREATE_ADMIN', 'Admin'),
 });
 
 // PUT /api/admin/:id - Update admin (admin only)
-router.put('/:id', auth, adminOnly, createActivityLogger('UPDATE_ADMIN', 'Admin'), async (req, res) => {
+router.put('/:id', auth, checkPermission('admins', 'write'), createActivityLogger('UPDATE_ADMIN', 'Admin'), async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, permissions } = req.body;
     const updateData = {};
     
+    // Validate permissions logic if permissions are being updated
+    if (permissions) {
+      const permCheck = validateAdminPermissions(permissions);
+      if (!permCheck.isValid) {
+        return res.status(400).json({ message: permCheck.error });
+      }
+      updateData.permissions = permissions;
+      // Only update superAdmin if permissions logic dictates it, or if explicitly turning off (though logic handles true case)
+      if (permCheck.isSuperAdmin) {
+        updateData.superAdmin = true;
+      } else {
+        // If not super admin by permission logic, we should probably respect the explicit superAdmin flag if passed, 
+        // OR set it to false if they lost the "all access" status. 
+        // The requirement says "in this case... set superAdmin true". 
+        // It implies if they DON'T have all access, they shouldn't be superAdmin?
+        // Let's assume if they don't meet the criteria, superAdmin is false.
+        updateData.superAdmin = false;
+      }
+    }
+
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (phone) updateData.phone = phone;
@@ -79,31 +141,55 @@ router.put('/:id', auth, adminOnly, createActivityLogger('UPDATE_ADMIN', 'Admin'
 });
 
 // DELETE /api/admin/:id - Delete admin (admin only)
-router.delete('/:id', auth, adminOnly, async (req, res) => {
+router.delete('/:id', auth, checkPermission('admins', 'write'), async (req, res) => {
   try {
     const admin = await Admin.findById(req.params.id);
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found' });
     }
     
+    // Get the admin who is performing the delete operation
+    const deletingAdmin = req.user;
+    const deletionDate = new Date().toLocaleString('en-US', { 
+      dateStyle: 'full', 
+      timeStyle: 'short' 
+    });
+    
     // Delete all activities of this admin first
     await AdminActivity.deleteMany({ adminId: req.params.id });
     
-    // Store admin name for activity logging
-    req.deletedItemName = admin.name;
+    // Store admin info for email and activity logging
+    const deletedAdminEmail = admin.email;
+    const deletedAdminName = admin.name;
     
     await Admin.findByIdAndDelete(req.params.id);
     
-    // Log the activity manually since we need the admin info before deletion
+    // Log the activity
     await logAdminActivity(
       req.user,
       'DELETE_ADMIN',
       'Admin',
       req.params.id,
-      admin.name,
-      { deletedAdmin: { name: admin.name, email: admin.email } },
+      deletedAdminName,
+      { deletedAdmin: { name: deletedAdminName, email: deletedAdminEmail } },
       req
     );
+    
+    // Send email notification to the deleted admin
+    try {
+      await sendAdminDeletionEmail({
+        to: deletedAdminEmail,
+        deletedAdminName: deletedAdminName,
+        deletionDate: deletionDate,
+        deletedByName: deletingAdmin.name,
+        deletedByEmail: deletingAdmin.email,
+        deletedByPhone: deletingAdmin.phone
+      });
+      console.log(`✅ Admin deletion email sent to ${deletedAdminEmail}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send admin deletion email:', emailError.message);
+      // Don't fail the deletion if email fails
+    }
     
     res.json({ message: 'Admin deleted successfully' });
   } catch (err) {

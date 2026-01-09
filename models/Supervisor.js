@@ -22,6 +22,52 @@ const supervisorSchema = new mongoose.Schema({
     type: String,
     default: 'supervisor'
   },
+  permissions: {
+    dashboard: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    tutors: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    hadiya: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    centers: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    students: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    tutorAttendance: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    guestTutors: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    announcements: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    supervisors: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    subjects: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    },
+    admins: {
+      read: { type: Boolean, default: false },
+      write: { type: Boolean, default: false }
+    }
+  },
   email: {
     type: String,
     required: [true, 'Please add an email'],

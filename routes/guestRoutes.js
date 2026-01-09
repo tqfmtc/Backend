@@ -1,7 +1,7 @@
 import express from 'express';
 const router = express.Router();
 import { protect } from '../middleware/auth.js';
-import { adminOnly, tutorOnly, guestOnly } from '../middleware/auth.js';
+import { adminOnly, tutorOnly, guestOnly, checkPermission } from '../middleware/auth.js';
 import { submitGuestRequest, getMyGuestRequests, getPendingGuestRequests, getGuestRequests, approveGuestRequest, guestLogin, submitGuestAttendance } from '../controllers/guestController.js';
 
 // @desc    Submit a guest tutor request
@@ -19,17 +19,17 @@ router.get('/my-requests', protect, tutorOnly, getMyGuestRequests);
 // @desc    Get all pending guest tutor requests
 // @route   GET /api/guest/pending
 // @access  Private (Admin)
-router.get('/pending', protect, adminOnly, getPendingGuestRequests);
+router.get('/pending', protect, checkPermission('guestTutors', 'read'), getPendingGuestRequests);
 
 // @desc    Get guest tutor requests (all or filtered)
 // @route   GET /api/guest/requests
 // @access  Private (Admin)
-router.get('/requests', protect, adminOnly, getGuestRequests);
+router.get('/requests', protect, checkPermission('guestTutors', 'read'), getGuestRequests);
 
 // @desc    Approve a guest tutor request
 // @route   POST /api/guest/approve/:id
 // @access  Private (Admin)
-router.post('/approve/:id', protect, adminOnly, approveGuestRequest);
+router.post('/approve/:id', protect, checkPermission('guestTutors', 'write'), approveGuestRequest);
 
 // @desc Guest attendance submission
 // @route POST /api/guest/attendance

@@ -308,8 +308,86 @@ export const sendAttendanceConfirmationEmail = async ({
   }
 };
 
+/**
+ * Sends an admin account deletion notification email
+ * @param {Object} options - Email options
+ * @param {string} options.to - Recipient email (deleted admin)
+ * @param {string} options.deletedAdminName - Name of the deleted admin
+ * @param {string} options.deletionDate - Date of deletion
+ * @param {string} options.deletedByName - Name of the admin who performed the deletion
+ * @param {string} options.deletedByEmail - Email of the admin who performed the deletion
+ * @param {string} options.deletedByPhone - Phone of the admin who performed the deletion
+ */
+export const sendAdminDeletionEmail = async ({ 
+  to, 
+  deletedAdminName, 
+  deletionDate, 
+  deletedByName, 
+  deletedByEmail, 
+  deletedByPhone 
+}) => {
+  console.log(`Sending admin deletion notification to: ${to}`);
+  
+  try {
+    const mailOptions = {
+      from: `"MTC" <${process.env.EMAIL_USER}>`,
+      to,
+      subject: 'Admin Account Deletion Notification',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #dc3545; color: white; padding: 20px; text-align: center;">
+            <h2>Admin Account Deleted</h2>
+          </div>
+          <div style="padding: 20px;">
+            <p>Dear ${deletedAdminName},</p>
+            <p>This is to inform you that your admin account has been deleted from the MTC system.</p>
+            
+            <div style="margin: 25px 0; padding: 15px; background-color: #f8f9fa; border-radius: 5px; border-left: 4px solid #dc3545;">
+              <p style="margin: 5px 0; font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;">Deletion Details:</p>
+              <p style="margin: 8px 0;">
+                <strong>Date of Deletion:</strong> ${deletionDate}
+              </p>
+              <p style="margin: 8px 0;">
+                <strong>Deleted By:</strong> ${deletedByName}
+              </p>
+              <p style="margin: 8px 0;">
+                <strong>Email:</strong> ${deletedByEmail}
+              </p>
+              <p style="margin: 8px 0;">
+                <strong>Phone:</strong> ${deletedByPhone}
+              </p>
+            </div>
+            
+            <p>You no longer have access to the MTC admin system. If you believe this deletion was made in error, please contact the administrator listed above.</p>
+            
+            <p style="margin-top: 30px;">Best regards,<br>MTC Administration Team</p>
+            
+            <hr style="margin-top: 30px; border: none; border-top: 1px solid #ddd;">
+            <p style="font-size: 12px; color: #666; margin-top: 15px;">
+              This is an automated message. Please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Admin deletion notification email sent to ${to}`);
+    return { success: true };
+  } catch (error) {
+    console.log('Error sending admin deletion email:', {
+      error: error.message,
+      stack: error.stack,
+      to,
+      timestamp: new Date().toISOString()
+    });
+    throw new Error(`Failed to send admin deletion email: ${error.message}`);
+  }
+};
+
 export default {
   sendHadiyaPaymentEmail,
   sendGuestApprovalEmail,
   sendAttendanceConfirmationEmail,
+  sendAdminDeletionEmail,
 };
