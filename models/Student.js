@@ -75,20 +75,16 @@ const studentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'StudentSubject'
   }],
-  attendance: [{
-    month: {
-      type: String,
-      required: true
-    },
-    presentDays: {
-      type: Number,
-      required: true
-    },
-    totalDays: {
-      type: Number,
-      required: true
-    }
-  }],
+  attendance: [
+  {
+    month: "2026-01",
+    days: [
+      { date: "2026-01-10", status: "Present" }
+    ],
+    presentDays: 1,
+    totalDays: 1
+  }
+],
   remarks: String,
   createdAt: {
     type: Date,
