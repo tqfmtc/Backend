@@ -521,36 +521,57 @@ export const deleteStudent = async (req, res) => {
 };
 
 export const markDailyAttendance = async (req, res) => {
-  try{
-    const {date,students}=req.body
-    if(!date || !students || !Array.isArray(students)){
-        return res.status(400).json("date and students array are required")
-    }
-    const results=[]
-    for(const studentAttendance of students){
-        const {studentId, status}=studentAttendance
-        const student= await Student.findById(studentId)
-        if(!student){
-            results.push({studentId, status:"Student not found"})
-            continue
-        }
-        // Check if attendance for the date already exists
-        const existingRecord= student.attendance.find(record=> record.date===date)
-        if(existingRecord){
-            existingRecord.status=status
-        } else{
-            student.attendance.push({date, status})
-        }
-        await student.save()
-        results.push({studentId, status:"Attendance marked"})
-    }
-    res.status(200).json(results)
+  try {
+    const { date, students } = req.body;
 
+    if (!date || !Array.isArray(students)) {
+      return res.status(400).json({ message: "date and students array are required" });
+    }
+
+    const month = date.slice(0, 7); // yyyy-mm
+    const results = [];
+
+    for (const { studentId, status } of students) {
+      const student = await Student.findById(studentId);
+
+      if (!student) {
+        results.push({ studentId, status: "Student not found" });
+        continue;
+      }
+
+      // Ensure attendance array exists
+      if (!Array.isArray(student.attendance)) {
+        student.attendance = [];
+      }
+
+      let record = student.attendance.find(r => r.month === month);
+
+      if (!record) {
+        record = {
+          month,
+          presentDays: 0,
+          totalDays: 0
+        };
+        student.attendance.push(record);
+      }
+
+      // Count this day
+      record.totalDays += 1;
+      if (status === 'Present') {
+        record.presentDays += 1;
+      }
+
+      await student.save();
+      results.push({ studentId, status: "Attendance marked" });
+    }
+
+    res.status(200).json(results);
+  } catch (error) {
+    console.error("Attendance error:", error);
+    res.status(500).json({ message: error.message });
   }
-  catch(error){
-    res.status(500).json({message:error.message})
-  }
-}
+};
+
 
 // @desc    Mark student attendance
 // @route   POST /api/students/:id/attendance
