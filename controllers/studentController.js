@@ -539,7 +539,6 @@ export const markDailyAttendance = async (req, res) => {
         continue;
       }
 
-      // Ensure attendance array exists
       if (!Array.isArray(student.attendance)) {
         student.attendance = [];
       }
@@ -549,15 +548,29 @@ export const markDailyAttendance = async (req, res) => {
       if (!record) {
         record = {
           month,
+          days: [],
           presentDays: 0,
           totalDays: 0
         };
         student.attendance.push(record);
       }
 
-      // Count this day
+      // 🔒 prevent duplicate marking for same date
+      const alreadyMarked = record.days?.some(d => d.date === date);
+      if (alreadyMarked) {
+        results.push({ studentId, status: "Already marked for this date" });
+        continue;
+      }
+
+      // ensure days array exists
+      if (!Array.isArray(record.days)) {
+        record.days = [];
+      }
+
+      // mark attendance for the day
+      record.days.push({ date, status });
       record.totalDays += 1;
-      if (status === 'Present') {
+      if (status === "Present") {
         record.presentDays += 1;
       }
 
