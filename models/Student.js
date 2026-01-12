@@ -77,14 +77,34 @@ const studentSchema = new mongoose.Schema({
   }],
   attendance: [
   {
-    month: "2026-01",
+    month: {
+      type: String, // "YYYY-MM"
+      required: true
+    },
     days: [
-      { date: "2026-01-10", status: "Present" }
+      {
+        date: {
+          type: String, // "YYYY-MM-DD"
+          required: true
+        },
+        status: {
+          type: String,
+          enum: ["Present", "Absent"],
+          required: true
+        }
+      }
     ],
-    presentDays: 1,
-    totalDays: 1
+    presentDays: {
+      type: Number,
+      default: 0
+    },
+    totalDays: {
+      type: Number,
+      default: 0
+    }
   }
-],
+]
+,
   remarks: String,
   createdAt: {
     type: Date,
