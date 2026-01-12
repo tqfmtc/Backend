@@ -535,11 +535,11 @@ export const markDailyAttendance = async (req, res) => {
             continue
         }
         // Check if attendance for the date already exists
-        const existingRecord= student.dailyAttendance.find(record=> record.date===date)
+        const existingRecord= student.attendance.find(record=> record.date===date)
         if(existingRecord){
             existingRecord.status=status
         } else{
-            student.dailyAttendance.push({date, status})
+            student.attendance.push({date, status})
         }
         await student.save()
         results.push({studentId, status:"Attendance marked"})
