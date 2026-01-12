@@ -528,12 +528,11 @@ export const markDailyAttendance = async (req, res) => {
       return res.status(400).json({ message: "date and students array are required" });
     }
 
-    const month = date.slice(0, 7); // yyyy-mm
+    const month = date.slice(0, 7);
     const results = [];
 
     for (const { studentId, status } of students) {
       const student = await Student.findById(studentId);
-
       if (!student) {
         results.push({ studentId, status: "Student not found" });
         continue;
@@ -555,33 +554,31 @@ export const markDailyAttendance = async (req, res) => {
         student.attendance.push(record);
       }
 
-      // 🔒 prevent duplicate marking for same date
-      const alreadyMarked = record.days?.some(d => d.date === date);
-      if (alreadyMarked) {
-        results.push({ studentId, status: "Already marked for this date" });
-        continue;
-      }
-
-      // ensure days array exists
       if (!Array.isArray(record.days)) {
         record.days = [];
       }
 
-      // mark attendance for the day
+      const alreadyMarked = record.days.some(d => d.date === date);
+      if (alreadyMarked) {
+        results.push({ studentId, status: "Already marked" });
+        continue;
+      }
+
       record.days.push({ date, status });
       record.totalDays += 1;
-      if (status === "Present") {
-        record.presentDays += 1;
-      }
+      if (status === "Present") record.presentDays += 1;
+
+      // 🔴 THIS IS THE FIX
+      student.markModified("attendance");
 
       await student.save();
       results.push({ studentId, status: "Attendance marked" });
     }
 
     res.status(200).json(results);
-  } catch (error) {
-    console.error("Attendance error:", error);
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
   }
 };
 
