@@ -30,13 +30,6 @@ app.use(cors({
     origin: '*',
     credentials: true
   }));
-app.use((req, res, next) => {
-  console.log('--- INCOMING REQUEST ---');
-  console.log('Method:', req.method);
-  console.log('URL:', req.originalUrl);
-  console.log('Content-Type:', req.headers['content-type']);
-  next();
-});
 
 app.use(express.json());
 app.use(morgan('dev'));
