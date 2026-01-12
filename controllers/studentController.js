@@ -523,64 +523,80 @@ export const deleteStudent = async (req, res) => {
 export const markDailyAttendance = async (req, res) => {
   try {
     const { date, students } = req.body;
-
     if (!date || !Array.isArray(students)) {
       return res.status(400).json({ message: "date and students array are required" });
     }
 
-    const month = date.slice(0, 7);
+    const month = date.slice(0, 7); // "YYYY-MM"
     const results = [];
 
     for (const { studentId, status } of students) {
-      const student = await Student.findById(studentId);
-      if (!student) {
-        results.push({ studentId, status: "Student not found" });
-        continue;
+      try {
+        const student = await Student.findById(studentId);
+        if (!student) {
+          results.push({ studentId, status: "Student not found" });
+          continue;
+        }
+
+        if (!Array.isArray(student.attendance)) student.attendance = [];
+
+        const monthIndex = student.attendance.findIndex(r => r.month === month);
+
+        if (monthIndex === -1) {
+          // No record for this month -> create new record with today's attendance
+          const present = status === "Present" ? 1 : 0;
+          const newRecord = {
+            month,
+            days: [{ date, status }],
+            presentDays: present,
+            totalDays: 1
+          };
+          student.attendance.push(newRecord);
+        } else {
+          // Modify existing month record (replace subdoc to ensure Mongoose persistance)
+          const record = student.attendance[monthIndex] || {
+            month,
+            days: [],
+            presentDays: 0,
+            totalDays: 0
+          };
+
+          record.days = Array.isArray(record.days) ? record.days : [];
+
+          // If today's attendance already recorded -> skip this student
+          const alreadyRecorded = record.days.some(d => d.date === date);
+          if (alreadyRecorded) {
+            results.push({ studentId, status: "Already marked" });
+            continue;
+          }
+
+          // Add today's entry and update counters
+          record.days.push({ date, status });
+          record.totalDays = (typeof record.totalDays === "number" ? record.totalDays : 0) + 1;
+          if (status === "Present") {
+            record.presentDays = (typeof record.presentDays === "number" ? record.presentDays : 0) + 1;
+          }
+
+          // Replace the subdocument so Mongoose detects the change reliably
+          student.attendance[monthIndex] = record;
+        }
+
+        await student.save();
+        results.push({ studentId, status: "Attendance marked" });
+      } catch (studentErr) {
+        console.error("Attendance error for student", studentId, studentErr);
+        results.push({ studentId, status: "Error", message: studentErr.message });
+        // continue to next student
       }
-
-      if (!Array.isArray(student.attendance)) {
-        student.attendance = [];
-      }
-
-      let record = student.attendance.find(r => r.month === month);
-
-      if (!record) {
-        record = {
-          month,
-          days: [],
-          presentDays: 0,
-          totalDays: 0
-        };
-        student.attendance.push(record);
-      }
-
-      if (!Array.isArray(record.days)) {
-        record.days = [];
-      }
-
-      const alreadyMarked = record.days.some(d => d.date === date);
-      if (alreadyMarked) {
-        results.push({ studentId, status: "Already marked" });
-        continue;
-      }
-
-      record.days.push({ date, status });
-      record.totalDays += 1;
-      if (status === "Present") record.presentDays += 1;
-
-      // 🔴 THIS IS THE FIX
-      student.markModified("attendance");
-
-      await student.save();
-      results.push({ studentId, status: "Attendance marked" });
     }
 
-    res.status(200).json(results);
+    return res.status(200).json(results);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: err.message });
+    console.error("markDailyAttendance error:", err);
+    return res.status(500).json({ message: err.message });
   }
 };
+
 
 
 // @desc    Mark student attendance
