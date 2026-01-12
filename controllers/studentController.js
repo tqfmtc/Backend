@@ -397,7 +397,7 @@ export const updateStudent = async (req, res) => {
   }
 };
 
-// change assignedTutor
+// change assignedTutor// change assignedTutor
 export const changeAssignedTutor = async (req, res) => {
   try {
     const { studentId, tutorId } = req.body;
@@ -409,14 +409,25 @@ export const changeAssignedTutor = async (req, res) => {
     if (!tutor) {
       return res.status(404).json({ message: 'Tutor not found' });
     }
+    const oldTutorId = student.assignedTutor ? student.assignedTutor.toString() : null;
+
+    // If the tutor is changing, remove student from old tutor's students array
+    if (oldTutorId && oldTutorId !== tutorId) {
+      await Tutor.findByIdAndUpdate(oldTutorId, { $pull: { students: student._id } });
+    }
+
+    // Add student to new tutor's students array (idempotent with $addToSet)
+    await Tutor.findByIdAndUpdate(tutorId, { $addToSet: { students: student._id } });
+
+    // Update student's assignedTutor and save
     student.assignedTutor = tutorId;
     await student.save();
-    
+
     // Populate the response with tutor details
     const updatedStudent = await Student.findById(student._id)
       .populate('assignedCenter', 'name location')
       .populate('assignedTutor', 'name contact email');
-    
+
     res.json({ message: 'Assigned tutor updated successfully', student: updatedStudent });
   } catch (error) {
     res.status(500).json({ message: error.message });
