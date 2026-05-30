@@ -242,14 +242,62 @@ export const getAttendanceReport = async (req, res) => {
     // Get all tutors for the selected center (or all centers), filtering by active status
     const tutorQuery = centerId ? { assignedCenter: centerId, status: { $in: ['active', 'pending'] } } : { status: { $in: ['active', 'pending'] } };
     const tutors = await Tutor.find(tutorQuery).populate('assignedCenter', 'name');
-    // console.log(`Found ${tutors.length} tutors for centerId: ${centerId || 'all centers'}`);
+
+    // Fetch Attendance records for this month to get timestamps (createdAt)
+    const attendanceDocsQuery = {
+      date: { $gte: monthStartDate, $lte: monthEndDate }
+    };
+    if (centerId) {
+      attendanceDocsQuery.center = centerId;
+    }
+    const attendanceDocs = await Attendance.find(attendanceDocsQuery);
+
+    // Build a lookup map: tutorId -> dateString -> time string (12h format)
+    const timestampMap = {};
+    attendanceDocs.forEach(doc => {
+      const tutorId = doc.tutor.toString();
+      const dateStr = format(new Date(doc.date), 'yyyy-MM-dd');
+      if (!timestampMap[tutorId]) timestampMap[tutorId] = {};
+      // Store the createdAt time formatted as 12h
+      const createdAt = doc.createdAt;
+      if (createdAt) {
+        const hours = createdAt.getHours();
+        const minutes = createdAt.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const h12 = hours % 12 || 12;
+        const minStr = String(minutes).padStart(2, '0');
+        timestampMap[tutorId][dateStr] = `${h12}:${minStr} ${ampm}`;
+      }
+    });
 
     // Generate all calendar days in the selected month
     const allDaysInMonth = eachDayOfInterval({ start: monthStartDate, end: monthEndDate });
 
+    // Helper to parse "H:MM AM/PM" to minutes since midnight
+    const parseTimeToMinutes = (t) => {
+      const match = t && t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (!match) return null;
+      let h = parseInt(match[1]);
+      const m = parseInt(match[2]);
+      const ap = match[3].toUpperCase();
+      if (ap === 'PM' && h !== 12) h += 12;
+      if (ap === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    };
+
+    // Helper to format minutes since midnight to 12h string
+    const minutesToTimeStr = (mins) => {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+    };
+
     // Build report for all tutors
     const report = tutors.map(tutor => {
       const dailyAttendance = {};
+      const tutorIdStr = tutor._id.toString();
 
       // Create a quick lookup for the tutor's existing attendance records for the month
       const tutorMonthlyAttendance = {};
@@ -260,10 +308,18 @@ export const getAttendanceReport = async (req, res) => {
         }
       });
 
-      // Populate dailyAttendance for all days in the month
+      // Populate dailyAttendance for all days in the month, including timestamps
       allDaysInMonth.forEach(dayInMonth => {
         const dayString = format(dayInMonth, 'yyyy-MM-dd');
-        dailyAttendance[dayString] = tutorMonthlyAttendance[dayString] || false; // false if not present or no record
+        const isPresent = tutorMonthlyAttendance[dayString] || false;
+        const timeStamp = (isPresent && timestampMap[tutorIdStr] && timestampMap[tutorIdStr][dayString]) 
+          ? timestampMap[tutorIdStr][dayString] 
+          : null;
+        
+        dailyAttendance[dayString] = {
+          present: isPresent,
+          time: timeStamp // null if absent or no timestamp
+        };
       });
 
       let centerInfo = { name: 'N/A' };
@@ -271,10 +327,22 @@ export const getAttendanceReport = async (req, res) => {
         centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
       }
 
+      // Calculate average mark time from timestamps
+      const presentTimestamps = Object.values(timestampMap[tutorIdStr] || {});
+      let avgTime = null;
+      if (presentTimestamps.length > 0) {
+        const minuteValues = presentTimestamps.map(parseTimeToMinutes).filter(v => v !== null);
+        if (minuteValues.length > 0) {
+          const avgMinutes = Math.round(minuteValues.reduce((s, v) => s + v, 0) / minuteValues.length);
+          avgTime = minutesToTimeStr(avgMinutes);
+        }
+      }
+
       return {
         tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
         center: centerInfo,
-        attendance: dailyAttendance // Map of 'yyyy-MM-dd': true (present) or false (absent/not marked)
+        attendance: dailyAttendance, // Map of 'yyyy-MM-dd': { present: bool, time: '3:30 PM' | null }
+        avgMarkTime: avgTime // Average time tutor marks attendance, null if no data
       };
     });
 
@@ -322,15 +390,40 @@ export const getTutorMonthlyCoordinates = async (req, res) => {
 
     const tutors = await Tutor.find(query).populate('assignedCenter', 'name');
 
+    // Fetch Attendance docs for timestamps
+    const attQuery = { date: { $gte: monthStartDate, $lte: monthEndDate } };
+    if (tutorId) attQuery.tutor = tutorId;
+    if (centerId) attQuery.center = centerId;
+    const attendanceDocs = await Attendance.find(attQuery);
+
+    // Build timestamp lookup: tutorId -> dateStr -> 12h time string
+    const tsMap = {};
+    attendanceDocs.forEach(doc => {
+      const tid = doc.tutor.toString();
+      const dStr = format(new Date(doc.date), 'yyyy-MM-dd');
+      if (!tsMap[tid]) tsMap[tid] = {};
+      if (doc.createdAt) {
+        const createdAt = doc.createdAt;
+        const hours = createdAt.getHours();
+        const minutes = createdAt.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const h12 = hours % 12 || 12;
+        tsMap[tid][dStr] = `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`;
+      }
+    });
+
     const data = tutors.map(tutor => {
+      const tutorIdStr = tutor._id.toString();
       const points = [];
       tutor.attendance.forEach(record => {
         const recordDate = new Date(record.date);
         if (recordDate >= monthStartDate && recordDate <= monthEndDate && record.status === 'present' && record.location && Array.isArray(record.location.coordinates)) {
           const [lng, lat] = record.location.coordinates; // GeoJSON order is [lng, lat]
+          const dateStr = format(recordDate, 'yyyy-MM-dd');
+          const timeStr = (tsMap[tutorIdStr] && tsMap[tutorIdStr][dateStr]) ? tsMap[tutorIdStr][dateStr] : null;
           points.push({
-            date: format(recordDate, 'yyyy-MM-dd'),
-            time: format(recordDate, 'HH:mm'),
+            date: dateStr,
+            time: timeStr,
             lat,
             lng,
             status: record.status
@@ -420,8 +513,33 @@ export const getTutorCoordinatesRange = async (req, res) => {
 
     const tutors = await Tutor.find(query).populate('assignedCenter', 'name');
 
+    // Fetch Attendance docs for timestamps in the range
+    const rangeAttQuery = {
+      date: { $gte: rangeStartDate, $lte: rangeEndDate }
+    };
+    if (tutorId) rangeAttQuery.tutor = tutorId;
+    if (centerId) rangeAttQuery.center = centerId;
+    const rangeAttendanceDocs = await Attendance.find(rangeAttQuery);
+
+    // Build timestamp lookup: tutorId -> dateStr -> 12h time string
+    const rangeTimestampMap = {};
+    rangeAttendanceDocs.forEach(doc => {
+      const tid = doc.tutor.toString();
+      const dStr = format(new Date(doc.date), 'yyyy-MM-dd');
+      if (!rangeTimestampMap[tid]) rangeTimestampMap[tid] = {};
+      if (doc.createdAt) {
+        const createdAt = doc.createdAt;
+        const hours = createdAt.getHours();
+        const minutes = createdAt.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const h12 = hours % 12 || 12;
+        rangeTimestampMap[tid][dStr] = `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`;
+      }
+    });
+
     // Build consolidated data for all tutors in the date range
     const data = tutors.map(tutor => {
+      const tutorIdStr = tutor._id.toString();
       const points = [];
       tutor.attendance.forEach(record => {
         const recordDate = new Date(record.date);
@@ -434,9 +552,13 @@ export const getTutorCoordinatesRange = async (req, res) => {
           Array.isArray(record.location.coordinates)
         ) {
           const [lng, lat] = record.location.coordinates; // GeoJSON order is [lng, lat]
+          const dateStr = format(recordDate, 'yyyy-MM-dd');
+          const timeStr = (rangeTimestampMap[tutorIdStr] && rangeTimestampMap[tutorIdStr][dateStr])
+            ? rangeTimestampMap[tutorIdStr][dateStr]
+            : null;
           points.push({
-            date: format(recordDate, 'yyyy-MM-dd'),
-            time: format(recordDate, 'HH:mm'),
+            date: dateStr,
+            time: timeStr,
             lat,
             lng,
             status: record.status
