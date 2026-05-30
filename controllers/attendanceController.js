@@ -222,58 +222,64 @@ export const clearRecentAttendance = async (req, res) => {
 
 export const getAttendanceReport = async (req, res) => {
   try {
-    const { month, year, centerId } = req.query;
+    const { month, year, fromMonth, fromYear, toMonth, toYear, centerId } = req.query;
 
-    if (!month || !year) {
-      return res.status(400).json({ message: 'Month and year are required query parameters.' });
+    // Support both single-month (month/year) and full range (fromMonth/fromYear/toMonth/toYear)
+    let startMonth, startYear, endMonth, endYear;
+
+    if (fromMonth && fromYear && toMonth && toYear) {
+      startMonth = parseInt(fromMonth, 10);
+      startYear  = parseInt(fromYear,  10);
+      endMonth   = parseInt(toMonth,   10);
+      endYear    = parseInt(toYear,    10);
+    } else if (month && year) {
+      startMonth = endMonth = parseInt(month, 10);
+      startYear  = endYear  = parseInt(year,  10);
+    } else {
+      return res.status(400).json({ message: 'Provide month+year or fromMonth+fromYear+toMonth+toYear.' });
     }
 
-    const numericMonth = parseInt(month, 10);
-    const numericYear = parseInt(year, 10);
-
-    if (isNaN(numericMonth) || isNaN(numericYear) || numericMonth < 1 || numericMonth > 12) {
+    if (
+      isNaN(startMonth) || isNaN(startYear) || isNaN(endMonth) || isNaN(endYear) ||
+      startMonth < 1 || startMonth > 12 || endMonth < 1 || endMonth > 12
+    ) {
       return res.status(400).json({ message: 'Invalid month or year format.' });
     }
 
-    // Define the start and end of the month for filtering and iteration
-    const monthStartDate = startOfMonth(new Date(numericYear, numericMonth - 1, 1));
-    const monthEndDate = endOfMonth(new Date(numericYear, numericMonth - 1, 1));
-    
-    // Get all tutors for the selected center (or all centers), filtering by active status
-    const tutorQuery = centerId ? { assignedCenter: centerId, status: { $in: ['active', 'pending'] } } : { status: { $in: ['active', 'pending'] } };
+    // Define the full date range
+    const rangeStartDate = startOfMonth(new Date(startYear, startMonth - 1, 1));
+    const rangeEndDate   = endOfMonth(new Date(endYear, endMonth - 1, 1));
+
+    // Get all tutors (optionally filtered by center)
+    const tutorQuery = centerId
+      ? { assignedCenter: centerId, status: { $in: ['active', 'pending'] } }
+      : { status: { $in: ['active', 'pending'] } };
     const tutors = await Tutor.find(tutorQuery).populate('assignedCenter', 'name');
 
-    // Fetch Attendance records for this month to get timestamps (createdAt)
-    const attendanceDocsQuery = {
-      date: { $gte: monthStartDate, $lte: monthEndDate }
-    };
-    if (centerId) {
-      attendanceDocsQuery.center = centerId;
-    }
+    // Fetch Attendance docs for the full range to get real createdAt timestamps
+    const attendanceDocsQuery = { date: { $gte: rangeStartDate, $lte: rangeEndDate } };
+    if (centerId) attendanceDocsQuery.center = centerId;
     const attendanceDocs = await Attendance.find(attendanceDocsQuery);
 
-    // Build a lookup map: tutorId -> dateString -> time string (12h format)
+    // Build lookup: tutorId -> dateString -> 12h time string
     const timestampMap = {};
     attendanceDocs.forEach(doc => {
       const tutorId = doc.tutor.toString();
       const dateStr = format(new Date(doc.date), 'yyyy-MM-dd');
       if (!timestampMap[tutorId]) timestampMap[tutorId] = {};
-      // Store the createdAt time formatted as 12h
-      const createdAt = doc.createdAt;
-      if (createdAt) {
-        const hours = createdAt.getHours();
-        const minutes = createdAt.getMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const h12 = hours % 12 || 12;
-        const minStr = String(minutes).padStart(2, '0');
-        timestampMap[tutorId][dateStr] = `${h12}:${minStr} ${ampm}`;
+      if (doc.createdAt) {
+        const h = doc.createdAt.getHours();
+        const m = doc.createdAt.getMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        timestampMap[tutorId][dateStr] = `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
       }
     });
 
-    // Generate all calendar days in the selected month
-    const allDaysInMonth = eachDayOfInterval({ start: monthStartDate, end: monthEndDate });
+    // Generate every calendar day in the range
+    const allDaysInRange = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate });
 
-    // Helper to parse "H:MM AM/PM" to minutes since midnight
+    // Helpers for avgMarkTime calculation
     const parseTimeToMinutes = (t) => {
       const match = t && t.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (!match) return null;
@@ -285,7 +291,6 @@ export const getAttendanceReport = async (req, res) => {
       return h * 60 + m;
     };
 
-    // Helper to format minutes since midnight to 12h string
     const minutesToTimeStr = (mins) => {
       const h = Math.floor(mins / 60);
       const m = mins % 60;
@@ -294,55 +299,51 @@ export const getAttendanceReport = async (req, res) => {
       return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
     };
 
-    // Build report for all tutors
+    // Build report for each tutor
     const report = tutors.map(tutor => {
-      const dailyAttendance = {};
       const tutorIdStr = tutor._id.toString();
 
-      // Create a quick lookup for the tutor's existing attendance records for the month
-      const tutorMonthlyAttendance = {};
+      // Quick lookup from embedded attendance records
+      const tutorAttendanceLookup = {};
       tutor.attendance.forEach(record => {
         const recordDate = new Date(record.date);
-        if (recordDate >= monthStartDate && recordDate <= monthEndDate) {
-          tutorMonthlyAttendance[format(recordDate, 'yyyy-MM-dd')] = record.status === 'present';
+        if (recordDate >= rangeStartDate && recordDate <= rangeEndDate) {
+          tutorAttendanceLookup[format(recordDate, 'yyyy-MM-dd')] = record.status === 'present';
         }
       });
 
-      // Populate dailyAttendance for all days in the month, including timestamps
-      allDaysInMonth.forEach(dayInMonth => {
-        const dayString = format(dayInMonth, 'yyyy-MM-dd');
-        const isPresent = tutorMonthlyAttendance[dayString] || false;
-        const timeStamp = (isPresent && timestampMap[tutorIdStr] && timestampMap[tutorIdStr][dayString]) 
-          ? timestampMap[tutorIdStr][dayString] 
+      // Build dailyAttendance map for every day in the range
+      const dailyAttendance = {};
+      allDaysInRange.forEach(day => {
+        const dayStr = format(day, 'yyyy-MM-dd');
+        const present = tutorAttendanceLookup[dayStr] || false;
+        const time = present && timestampMap[tutorIdStr]?.[dayStr]
+          ? timestampMap[tutorIdStr][dayStr]
           : null;
-        
-        dailyAttendance[dayString] = {
-          present: isPresent,
-          time: timeStamp // null if absent or no timestamp
-        };
+        dailyAttendance[dayStr] = { present, time };
       });
 
-      let centerInfo = { name: 'N/A' };
-      if (tutor.assignedCenter && tutor.assignedCenter.name) {
-        centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
+      // Average mark time across all present days in the range
+      const allTimes = Object.values(timestampMap[tutorIdStr] || {});
+      let avgMarkTime = null;
+      if (allTimes.length > 0) {
+        const minuteVals = allTimes.map(parseTimeToMinutes).filter(v => v !== null);
+        if (minuteVals.length > 0) {
+          const avg = Math.round(minuteVals.reduce((s, v) => s + v, 0) / minuteVals.length);
+          avgMarkTime = minutesToTimeStr(avg);
+        }
       }
 
-      // Calculate average mark time from timestamps
-      const presentTimestamps = Object.values(timestampMap[tutorIdStr] || {});
-      let avgTime = null;
-      if (presentTimestamps.length > 0) {
-        const minuteValues = presentTimestamps.map(parseTimeToMinutes).filter(v => v !== null);
-        if (minuteValues.length > 0) {
-          const avgMinutes = Math.round(minuteValues.reduce((s, v) => s + v, 0) / minuteValues.length);
-          avgTime = minutesToTimeStr(avgMinutes);
-        }
+      let centerInfo = { name: 'N/A' };
+      if (tutor.assignedCenter?.name) {
+        centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
       }
 
       return {
         tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
         center: centerInfo,
-        attendance: dailyAttendance, // Map of 'yyyy-MM-dd': { present: bool, time: '3:30 PM' | null }
-        avgMarkTime: avgTime // Average time tutor marks attendance, null if no data
+        attendance: dailyAttendance,
+        avgMarkTime
       };
     });
 
@@ -352,6 +353,7 @@ export const getAttendanceReport = async (req, res) => {
     res.status(500).json({ message: 'Error fetching attendance report', errorDetails: error.message });
   }
 };
+
 
 
 // Get monthly attendance coordinates for tutors (all or specific tutor)
