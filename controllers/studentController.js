@@ -177,33 +177,84 @@ export const createStudent = async (req, res) => {
       }
     }
   }
-    // Create student with proper data structure
-    const studentData = {
-      name,
-      fatherName,
+
+    // Check if a student with the same contact and center already exists (including inactive)
+    const existingStudent = await Student.findOne({
       contact,
-      isOrphan,
-      guardianInfo: isOrphan ? guardianInfo : undefined,
-      isNonSchoolGoing,
-      schoolInfo: !isNonSchoolGoing ? schoolInfo : undefined,
-      schoolAddress: !isNonSchoolGoing ? schoolAddress : undefined,
-      gender,
-      medium,
-      aadharNumber,
-      homeAddress,
-      assignedCenter,
-      assignedTutor,
-      remarks,
-      attendance: [], // Initialize empty attendance array
-      status: 'active' // Always set status to active on creation
-    };
+      assignedCenter
+    });
 
-    console.log('Creating student with data:', studentData); // Debug log
+    let student;
 
-    const student = await Student.create(studentData);
+    if (existingStudent) {
+      // If student exists and is inactive, reactivate them
+      if (existingStudent.status === 'inactive') {
+        console.log('Reactivating existing student:', existingStudent._id);
+        
+        // Update the student with new data
+        existingStudent.name = name;
+        existingStudent.fatherName = fatherName;
+        existingStudent.isOrphan = isOrphan;
+        existingStudent.guardianInfo = isOrphan ? guardianInfo : undefined;
+        existingStudent.isNonSchoolGoing = isNonSchoolGoing;
+        existingStudent.schoolInfo = !isNonSchoolGoing ? schoolInfo : undefined;
+        existingStudent.schoolAddress = !isNonSchoolGoing ? schoolAddress : undefined;
+        existingStudent.gender = gender;
+        existingStudent.medium = medium;
+        existingStudent.aadharNumber = aadharNumber;
+        existingStudent.homeAddress = homeAddress;
+        existingStudent.assignedTutor = assignedTutor;
+        existingStudent.remarks = remarks;
+        existingStudent.status = 'active';
+
+        student = await existingStudent.save();
+      } else {
+        // Student already exists and is active
+        return res.status(400).json({ 
+          message: 'A student with this contact number already exists in this center'
+        });
+      }
+    } else {
+      // Create new student with proper data structure
+      const studentData = {
+        name,
+        fatherName,
+        contact,
+        isOrphan,
+        guardianInfo: isOrphan ? guardianInfo : undefined,
+        isNonSchoolGoing,
+        schoolInfo: !isNonSchoolGoing ? schoolInfo : undefined,
+        schoolAddress: !isNonSchoolGoing ? schoolAddress : undefined,
+        gender,
+        medium,
+        aadharNumber,
+        homeAddress,
+        assignedCenter,
+        assignedTutor,
+        remarks,
+        attendance: [], // Initialize empty attendance array
+        status: 'active' // Always set status to active on creation
+      };
+
+      console.log('Creating student with data:', studentData); // Debug log
+
+      student = await Student.create(studentData);
+    }
 
     // Add student to center's students array (use $addToSet for safety)
     await Center.findByIdAndUpdate(student.assignedCenter, { $addToSet: { students: student._id } });
+
+    // Clear old subjects if reactivating
+    if (existingStudent && existingStudent.subjects && existingStudent.subjects.length > 0) {
+      // Remove student from old subjects
+      await Subject.updateMany(
+        { _id: { $in: existingStudent.subjects.map(s => s.subject || s) } },
+        { $pull: { students: student._id } }
+      );
+      // Delete old StudentSubject records
+      await StudentSubject.deleteMany({ student: student._id });
+      student.subjects = [];
+    }
 
     // Handle subjects if provided
     if (req.body.subjects && Array.isArray(req.body.subjects) && req.body.subjects.length > 0) {
