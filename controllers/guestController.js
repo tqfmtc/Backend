@@ -206,10 +206,10 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
         const [guestLat, guestLon] = currentLocation;
         const [centerLat, centerLon] = center.coordinates;
 
-        const withinRange = isWithinRadius(guestLat, guestLon, centerLat, centerLon, 1300);
+        const withinRange = isWithinRadius(guestLat, guestLon, centerLat, centerLon, 50);
         if (!withinRange) {
             const dist = calculateDistance(guestLat, guestLon, centerLat, centerLon);
-            return res.status(400).json({ message: 'You must be within 1300 meters of the center to submit attendance', distance: dist });
+            return res.status(400).json({ message: 'You must be within 50 meters of the center to submit attendance', distance: dist });
         }
 
         const today = new Date();

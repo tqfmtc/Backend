@@ -578,13 +578,13 @@ export const submitAttendance = async (req, res) => {
       tutorLon,
       centerLat,
       centerLon,
-      100
+      50
     );
 
     if (!isWithinRange) {
       const distance = calculateDistance(tutorLat, tutorLon, centerLat, centerLon);
       return res.status(400).json({
-        message: 'You must be within 1300 meters of the center to submit attendance',
+        message: 'You must be within 50 meters of the center to submit attendance',
         distance: distance,
         tutorLocation: [tutorLat, tutorLon],
         centerLocation: [centerLat, centerLon]
