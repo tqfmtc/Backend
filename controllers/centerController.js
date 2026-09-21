@@ -230,7 +230,7 @@ export const checkTutorLocation = async (req, res) => {
     }
 
     // Calculate distance between tutor and center (using MongoDB's geospatial queries)
-    const maxDistance = 100; // 100 meters radius
+    const maxDistance = 50; // 50 meters radius
     
     const distance = await Center.aggregate([
       {
@@ -255,7 +255,7 @@ export const checkTutorLocation = async (req, res) => {
   }
 };
 
-// @desc    Get all tutors within 100 meters of a center
+// @desc    Get all tutors within 50 meters of a center
 // @route   GET /api/centers/:centerId/nearby-tutors
 // @access  Private/Admin
 export const getNearbyTutors = async (req, res) => {
@@ -266,7 +266,7 @@ export const getNearbyTutors = async (req, res) => {
     if (!center.coordinates || center.coordinates.length !== 2) {
       return res.status(400).json({ message: 'Center does not have valid coordinates' });
     }
-    // Find tutors within 100 meters (0.1 km)
+    // Find tutors within 50 meters
     const tutors = await Tutor.find({
       location: {
         $nearSphere: {
@@ -274,7 +274,7 @@ export const getNearbyTutors = async (req, res) => {
             type: 'Point',
             coordinates: [center.coordinates[1], center.coordinates[0]] // [lng, lat]
           },
-          $maxDistance: 100 // meters
+          $maxDistance: 50 // meters
         }
       }
     });
