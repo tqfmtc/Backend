@@ -86,33 +86,30 @@ export const  markAttendance = async (req, res) => {
       status: status,
       markedBy: adminId
     });
-    let attendanceDoc;
-    try {
-      attendanceDoc = await Attendance.create({
-        tutor: tutor._id,
-        center: center._id,
-        date: recordDate,
-        status: status,
-        markedBy: adminId // (this will be the tutor's ID if tutors mark their own attendance)
-      });
-      console.log('Attendance document created:', attendanceDoc);
-    } catch (err) {
-      console.error('Error creating Attendance document:', err);
-    }
+    // Upsert: there is a unique index on (tutor, date), so re-marking a day must
+    // correct the existing record instead of creating a second one
+    const attendanceDoc = await Attendance.findOneAndUpdate(
+      { tutor: tutor._id, date: recordDate },
+      { $set: { center: center._id, status: status, markedBy: adminId } },
+      { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
+    );
 
-    // Always push a new record to the embedded array
-    tutor.attendance.push({
-      date: recordDate,
-      status: status,
-      center: center._id,
-      centerName: center.name,
-      markedBy: adminId,
-      createdAt: attendanceDoc.createdAt
-    });
+    // Keep the embedded copy in sync: update that day's entry, or add it
+    const existingIndex = tutor.attendance.findIndex(
+      r => r.date && r.date.getTime() === recordDate.getTime()
+    );
+    if (existingIndex === -1) {
+      tutor.attendance.push({ ...attendanceRecord, createdAt: attendanceDoc.createdAt });
+    } else {
+      const existing = tutor.attendance[existingIndex];
+      existing.status = status;
+      existing.center = center._id;
+      existing.centerName = center.name;
+      existing.markedBy = adminId;
+    }
     await tutor.save();
 
-    // Return the newly added record (the last one in the array)
-    const savedRecord = tutor.attendance[tutor.attendance.length - 1];
+    const savedRecord = tutor.attendance[existingIndex === -1 ? tutor.attendance.length - 1 : existingIndex];
 
     res.status(200).json({
       message: 'Attendance marked successfully',
