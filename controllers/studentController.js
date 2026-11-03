@@ -915,7 +915,7 @@ export const getStudentFullReport = async (req, res) => {
         path: 'subjects',
         populate: {
           path: 'subject',
-          select: 'name description',
+          select: 'subjectName description',
         },
       });
 
@@ -926,9 +926,9 @@ export const getStudentFullReport = async (req, res) => {
 
         // Filter attendance by date range
         studentObj.attendance = studentObj.attendance.filter((att) => {
-          // Parse month string (format: "January 2024", "February 2024", etc.)
-          const [monthName, attYear] = att.month.split(' ');
-          const attMonthNum = monthNames.indexOf(monthName) + 1;
+          // Parse month string (format: "YYYY-MM", as stored by every attendance writer)
+          const [attYear, attMonth] = String(att.month).split('-');
+          const attMonthNum = parseInt(attMonth);
           const attYearNum = parseInt(attYear);
 
           // Check if attendance falls within the range
@@ -940,7 +940,7 @@ export const getStudentFullReport = async (req, res) => {
         const subjectRecords = await StudentSubject.find({ 
           student: student._id 
         })
-          .populate('subject', 'name description')
+          .populate('subject', 'subjectName description')
           .lean();
 
         // Filter marks by date range
