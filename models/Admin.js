@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import passwordChangedAt from './plugins/passwordChangedAt.js';
 import bcrypt from 'bcryptjs';
 
 const adminSchema = new mongoose.Schema({
@@ -105,6 +106,8 @@ adminSchema.pre('save', async function(next) {
 adminSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+adminSchema.plugin(passwordChangedAt);
 
 const Admin = mongoose.model('Admin', adminSchema);
 

@@ -37,6 +37,11 @@ export const auth = async (req, res, next) => {
       return res.status(401).json({ message: 'Token is not valid (user not found)' });
     }
 
+    // Changing a password revokes every token issued before the change
+    if (user.passwordChangedAt && decoded.iat * 1000 < user.passwordChangedAt.getTime()) {
+      return res.status(401).json({ message: 'Password was changed. Please log in again.' });
+    }
+
     req.user = user;
     req.role = decoded.role;
     next();
