@@ -1,13 +1,14 @@
 import express from 'express';
 const router = express.Router();
 import { protect } from '../middleware/auth.js';
+import { loginLimiter } from '../middleware/rateLimit.js';
 import { adminOnly, tutorOnly, guestOnly, checkPermission } from '../middleware/auth.js';
 import { submitGuestRequest, getMyGuestRequests, getPendingGuestRequests, getGuestRequests, approveGuestRequest, guestLogin, submitGuestAttendance } from '../controllers/guestController.js';
 
 // @desc    Submit a guest tutor request
 // @route   POST /api/guest/request
 // @access  Private (Tutor)
-router.post('/login', guestLogin);
+router.post('/login', loginLimiter('guest'), guestLogin);
 
 router.post('/request', protect, tutorOnly, submitGuestRequest);
 

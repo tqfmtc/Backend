@@ -2,6 +2,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest.js';
 import {adminOnly, auth} from '../middleware/auth.js';
+import { loginLimiter, forgotPasswordLimiter, resetTokenLimiter } from '../middleware/rateLimit.js';
 import {
   adminLogin,
   tutorLogin,
@@ -46,12 +47,12 @@ const supervisorRegisterValidation = [
   body('assignedCenters').isArray().withMessage('Assigned centers must be an array')
 ];
 
-router.post('/admin/login', adminLoginValidation, validateRequest, adminLogin);
+router.post('/admin/login', loginLimiter('admin'), adminLoginValidation, validateRequest, adminLogin);
 router.post('/admin/register',auth,adminOnly, adminRegisterValidation, validateRequest, registerAdmin);
-router.post('/tutor/login', tutorLoginValidation, validateRequest, tutorLogin);
-router.post('/supervisor/login', supervisorLoginValidation,validateRequest, supervisorLogin)
+router.post('/tutor/login', loginLimiter('tutor'), tutorLoginValidation, validateRequest, tutorLogin);
+router.post('/supervisor/login', loginLimiter('supervisor'), supervisorLoginValidation,validateRequest, supervisorLogin)
 router.post('/supervisor/register',auth,adminOnly,supervisorRegisterValidation,validateRequest, registerSupervisor)
-router.post('/tutor/password-reset/:token', passwordReset )
-router.post('/tutor/forgot-password', generatePasswordResetToken)
+router.post('/tutor/password-reset/:token', resetTokenLimiter, passwordReset )
+router.post('/tutor/forgot-password', forgotPasswordLimiter, generatePasswordResetToken)
 
 export default router;
