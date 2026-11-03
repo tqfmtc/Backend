@@ -204,7 +204,12 @@ export const getAllSubjects = async (req, res) => {
 export const getByCenter = async (req, res) => {
     try {
         const { id, centerId } = req.params;
-        
+
+        // Tutors may only list students of their own center
+        if (req.role === 'tutor' && (await getTutorCenterId(req.user._id)) !== String(centerId)) {
+            return res.status(403).json({ message: 'Not authorized for this center' });
+        }
+
         const subject = await Subject.findById(id).populate({
             path: 'students',
             match: { assignedCenter: centerId },
