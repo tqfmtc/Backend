@@ -1,5 +1,22 @@
 import AdminActivity from '../models/AdminActivity.js';
 
+// Keys whose values must never be persisted in the activity log
+const SENSITIVE_KEYS = new Set(['password', 'newpassword', 'oldpassword', 'confirmpassword', 'token', 'pin']);
+
+export const redactSensitive = (value) => {
+  if (Array.isArray(value)) return value.map(redactSensitive);
+  // Leave Dates, ObjectIds and other BSON/Buffer values intact
+  if (value && typeof value === 'object' && !(value instanceof Date) && !value._bsontype && !Buffer.isBuffer(value)) {
+    const plain = typeof value.toObject === 'function' ? value.toObject() : value;
+    return Object.fromEntries(
+      Object.entries(plain)
+        .filter(([key]) => !SENSITIVE_KEYS.has(key.toLowerCase()))
+        .map(([key, v]) => [key, redactSensitive(v)])
+    );
+  }
+  return value;
+};
+
 // Helper function to log admin activity
 export const logAdminActivity = async (adminUser, action, targetType, targetId, targetName, details = {}, req = null) => {
   try {
@@ -11,7 +28,7 @@ export const logAdminActivity = async (adminUser, action, targetType, targetId, 
       targetType,
       targetId,
       targetName,
-      details,
+      details: redactSensitive(details),
       ipAddress: req ? req.ip || req.connection.remoteAddress : null,
       userAgent: req ? req.get('User-Agent') : null
     };
