@@ -37,14 +37,13 @@ export const recordHadiyaPayment = async (req, res) => {
 
     if (existingRecordIndex > -1) {
       if (update) {
-        // If update flag is true, update the existing record
-        tutor.hadiyaRecords[existingRecordIndex] = {
-          ...tutor.hadiyaRecords[existingRecordIndex],
-          amountPaid: paymentRecord.amountPaid,
-          notes: paymentRecord.notes,
-          datePaid: paymentRecord.datePaid,
-          paidBy: paymentRecord.paidBy
-        };
+        // If update flag is true, update the existing record in place
+        // (spreading a Mongoose subdocument drops its fields, including month/year)
+        const existing = tutor.hadiyaRecords[existingRecordIndex];
+        existing.amountPaid = paymentRecord.amountPaid;
+        existing.notes = paymentRecord.notes;
+        existing.datePaid = paymentRecord.datePaid;
+        existing.paidBy = paymentRecord.paidBy;
       } else {
         // If update flag is not true, prevent duplicate payment
         return res.status(400).json({ message: `Hadiya payment for ${month}/${year} has already been recorded for this tutor.` });
