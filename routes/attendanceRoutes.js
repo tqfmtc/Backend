@@ -11,13 +11,14 @@ router.use(auth);
 router.post('/buttonToggle', checkPermission('tutorAttendance', 'write'), toggleAttendanceButton)
 
 //get button status
-router.get('/buttonStatus', checkPermission('tutorAttendance', 'read'), buttonStatus)
+router.get('/buttonStatus', checkPermission('tutorAttendance', 'read', { allowTutor: true }), buttonStatus)
 
 // Mark attendance
 router.post('/mark', checkPermission('tutorAttendance', 'write'), markAttendance);
 
 // Get recent attendance (accessible to both tutors and admins)
-router.get('/recent', checkPermission('tutorAttendance', 'read'), getRecentAttendance);
+// Tutors only get their own record for today (enforced in getRecentAttendance)
+router.get('/recent', checkPermission('tutorAttendance', 'read', { allowTutor: true }), getRecentAttendance);
 
 // Get attendance report
 router.get('/report', adminOnly, getAttendanceReport);

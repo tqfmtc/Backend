@@ -55,21 +55,25 @@ const fullReportValidation = [
   body('studentIds.*').isMongoId().withMessage('Each studentId must be a valid MongoDB ID')
 ];
 
+// Routes marked allowTutor are used by the tutor web dashboard / mobile app;
+// their controllers restrict tutors to students of their own center.
+const tutorOk = { allowTutor: true };
+
 router.route('/')
-  .get(protect, checkPermission('students', 'read'), getStudents)
-  .post(protect, checkPermission('students', 'write'), studentValidation, validateRequest, createStudent);
+  .get(protect, checkPermission('students', 'read', tutorOk), getStudents)
+  .post(protect, checkPermission('students', 'write', tutorOk), studentValidation, validateRequest, createStudent);
 
 router.get('/getByCenter/:centerId', protect, checkPermission('students', 'read'), getStudentByCenter);
 
-router.post('/markDailyAttendance', protect, checkPermission('students', 'write'), markDailyAttendance)
+router.post('/markDailyAttendance', protect, checkPermission('students', 'write', tutorOk), markDailyAttendance)
 
 // Full report endpoint
 router.post('/FullReport/students', protect, checkPermission('students', 'read'), fullReportValidation, validateRequest, getStudentFullReport);
 
 router.route('/:id')
-  .get(protect, checkPermission('students', 'read'), getStudent)
-  .put(protect, checkPermission('students', 'write'), studentValidation, validateRequest, updateStudent)
-  .delete(protect, checkPermission('students', 'write'), deleteStudent);
+  .get(protect, checkPermission('students', 'read', tutorOk), getStudent)
+  .put(protect, checkPermission('students', 'write', tutorOk), studentValidation, validateRequest, updateStudent)
+  .delete(protect, checkPermission('students', 'write', tutorOk), deleteStudent);
 
 // Change assigned tutor endpoint
 router.post('/change-assigned-tutor', protect, checkPermission('students', 'write'), changeAssignedTutor);
@@ -78,7 +82,7 @@ router.post('/change-assigned-tutor', protect, checkPermission('students', 'writ
 router.put('/change-center/:studentId', protect, checkPermission('students', 'write'), changeAssignedCenter);
 
 router.route('/:id/attendance')
-  .post(protect, checkPermission('students', 'write'), attendanceValidation, validateRequest, markAttendance);
+  .post(protect, checkPermission('students', 'write', tutorOk), attendanceValidation, validateRequest, markAttendance);
 
 // Report routes
 router.get('/:id/attendance-report', protect, checkPermission('students', 'read'), dateRangeValidation, validateRequest, getStudentAttendanceReport);

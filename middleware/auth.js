@@ -23,6 +23,9 @@ export const auth = async (req, res, next) => {
       user = await Admin.findById(decoded.id).select('-password');
     } else if (decoded.role === 'tutor') {
       user = await Tutor.findById(decoded.id).select('-password');
+      if (user && user.status === 'inactive') {
+        return res.status(401).json({ message: 'Account is inactive. Please contact admin.' });
+      }
     } else if (decoded.role === 'guest') {
       user = { _id: decoded.id };
       req.tutorId = decoded.tutorId;
@@ -55,11 +58,15 @@ export const adminOnly = (req, res, next) => {
 };
 
 // Middleware to check admin permissions
-export const checkPermission = (resource, action) => {
+// Tutors are denied unless the route opts in with { allowTutor: true };
+// those controllers must scope tutor access themselves (own center / own record).
+export const checkPermission = (resource, action, { allowTutor = false } = {}) => {
   return (req, res, next) => {
-    // If user is a tutor, allow them to pass through
     if (req.role === 'tutor') {
-      return next();
+      if (allowTutor) {
+        return next();
+      }
+      return res.status(403).json({ message: 'Access denied for tutors' });
     }
 
     // Ensure user is an admin
