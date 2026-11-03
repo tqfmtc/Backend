@@ -1,3 +1,5 @@
+// Secrets (MONGODB_URI, JWT_SECRET, EMAIL_USER, EMAIL_PASS, ...) are NOT kept here.
+// They are loaded from the server's untracked .env file by dotenv in server.js.
 module.exports = {
   apps: [{
     name: 'backend',
@@ -6,12 +8,7 @@ module.exports = {
     instances: 1,
     env: {
       NODE_ENV: 'development',
-      PORT: 5000,
-      MONGODB_URI: 'mongodb+srv://***REMOVED***@cluster0.iepde.mongodb.net/mohalla_tuition',
-      JWT_SECRET: '***REMOVED***',
-      CORS_ORIGIN: 'http://localhost:5173',
-      EMAIL_USER: 'noreplymtc.2025@gmail.com',
-      EMAIL_PASS: '***REMOVED***'
+      PORT: 5000
     }
   }]
 };
