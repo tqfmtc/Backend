@@ -33,7 +33,11 @@ export const rateLimit = ({ name, windowMs, max, key, message = 'Too many attemp
   };
 };
 
-const identifier = (req) => String(req.body?.phone || req.body?.email || '').trim().toLowerCase();
+// Logins send phone/email; the forgot-password form sends tutorNumber/tutorMail
+const identifier = (req) => {
+  const b = req.body || {};
+  return String(b.phone || b.email || b.tutorNumber || b.tutorMail || '').trim().toLowerCase();
+};
 
 // 10 login attempts per account per 15 minutes
 export const loginLimiter = (name) => rateLimit({ name, windowMs: 15 * 60 * 1000, max: 10, key: identifier });
