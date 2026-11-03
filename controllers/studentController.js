@@ -730,10 +730,12 @@ export const markAttendance = async (req, res) => {
       return res.status(400).json({ message: 'Present days cannot exceed total days' });
     }
 
-    // Update or add attendance record
+    // Update or add attendance record. Update the totals in place: replacing the
+    // record would throw away the month's daily entries (days[]).
     const attendanceIndex = student.attendance.findIndex(a => a.month === month);
     if (attendanceIndex > -1) {
-      student.attendance[attendanceIndex] = { month, presentDays, totalDays };
+      student.attendance[attendanceIndex].presentDays = presentDays;
+      student.attendance[attendanceIndex].totalDays = totalDays;
     } else {
       student.attendance.push({ month, presentDays, totalDays });
     }
