@@ -383,8 +383,20 @@ export const updateStudent = async (req, res) => {
     if (req.body.subjects && Array.isArray(req.body.subjects)) {
       // Get existing StudentSubject records for this student
       const existingRecords = await StudentSubject.find({ student: student._id });
-      const existingSubjectIds = existingRecords.map(record => record.subject.toString());
-      const newSubjectIds = req.body.subjects;
+      const existingSubjectIds = existingRecords
+        .filter(record => record.subject)
+        .map(record => record.subject.toString());
+      // Clients may send Subject ids or StudentSubject record ids (older mobile builds
+      // send the latter); map record ids to their Subject id so they aren't treated as removals
+      const recordIdToSubjectId = new Map(
+        existingRecords.filter(r => r.subject).map(r => [r._id.toString(), r.subject.toString()])
+      );
+      const newSubjectIds = [...new Set(
+        req.body.subjects.map(id => {
+          const idStr = String(id?._id || id);
+          return recordIdToSubjectId.get(idStr) || idStr;
+        })
+      )];
 
       // Find subjects to add and remove
       const subjectsToAdd = newSubjectIds.filter(id => !existingSubjectIds.includes(id));
@@ -396,8 +408,6 @@ export const updateStudent = async (req, res) => {
         const recordToRemove = existingRecords.find(r => r.subject.toString() === subjectId);
         if (recordToRemove) {
           await StudentSubject.findByIdAndDelete(recordToRemove._id);
-          // Remove from student's subjects array
-          student.subjects = student.subjects.filter(id => id.toString() !== recordToRemove._id.toString());
         }
         // Remove student from subject's students array
         await Subject.findByIdAndUpdate(subjectId, { 
@@ -410,28 +420,29 @@ export const updateStudent = async (req, res) => {
         const subject = await Subject.findById(subjectId);
         if (subject) {
           // Create StudentSubject record
-          const studentSubjectRecord = await StudentSubject.create({
+          await StudentSubject.create({
             student: student._id,
             subject: subjectId,
             marksPercentage: []
           });
-          
-          // Add to student's subjects array
-          student.subjects.push(studentSubjectRecord._id);
-          
+
           // Add student to subject's students array
-          await Subject.findByIdAndUpdate(subjectId, { 
-            $addToSet: { students: student._id } 
+          await Subject.findByIdAndUpdate(subjectId, {
+            $addToSet: { students: student._id }
           });
         }
       }
-      
-      await student.save();
     }
+
+    // student.subjects must hold StudentSubject record ids; rebuild it from the
+    // records so it can never be overwritten with raw Subject ids from the request
+    const currentRecords = await StudentSubject.find({ student: student._id }).select('_id');
+    const { subjects, attendance, _id, ...updateFields } = req.body;
+    updateFields.subjects = currentRecords.map(r => r._id);
 
     const updatedStudent = await Student.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateFields,
       { new: true, runValidators: true }
     ).populate('assignedCenter', 'name location')
      .populate('assignedTutor', 'name contact email')
