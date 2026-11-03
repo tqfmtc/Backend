@@ -9,18 +9,19 @@ const router = express.Router();
 router.post('/', auth, checkPermission('subjects', 'write'), createActivityLogger('CREATE_SUBJECT', 'StudentSubject'), addSubject);
 
 // DELETE /api/subject/remove-students/:id - Delete students from subject
-router.delete('/remove-students/:id', auth, checkPermission('subjects', 'write'), removeStudentFromSubject); 
+// Tutors may only add/remove students of their own center (enforced in the controllers)
+router.delete('/remove-students/:id', auth, checkPermission('subjects', 'write', { allowTutor: true }), removeStudentFromSubject);
 
-// POST /api/subjects/add-students - Add students to a subject (admin only)
-router.post('/add-students', auth, checkPermission('subjects', 'write'), addStudentsToSubject,createStudentSubjectRecord);
+// POST /api/subjects/add-students - Add students to a subject
+router.post('/add-students', auth, checkPermission('subjects', 'write', { allowTutor: true }), addStudentsToSubject,createStudentSubjectRecord);
 
 // POST /api/subjects/add-tutors - Add tutors to a subject (admin only)
 router.post('/add-tutors', auth, checkPermission('subjects', 'write'), createActivityLogger('ADD_TUTORS_TO_SUBJECT', 'StudentSubject'), addTutorsToSubject);
 
 // GET /api/subjects - Get all subjects
-router.get('/', auth, checkPermission('subjects', 'read'), getAllSubjects);
+router.get('/', auth, checkPermission('subjects', 'read', { allowTutor: true }), getAllSubjects);
 
-router.get('/:id/:centerId', auth, checkPermission('subjects', 'read'), getByCenter);
+router.get('/:id/:centerId', auth, checkPermission('subjects', 'read', { allowTutor: true }), getByCenter);
 
 // GET /api/subjects/:id - Get subject by ID
 router.get('/:id', auth, checkPermission('subjects', 'read'), getSubjectById);

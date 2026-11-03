@@ -12,18 +12,19 @@ export const getStudents = async (req, res) => {
     // No need to filter by tutor anymore since students are only linked to centers
     // All tutors assigned to a center can view all students from that center
     // Determine status filter: 'active' by default, 'inactive' or 'all' from query
-  const statusFilter = req.query.status || 'active';
+  const statusFilter = String(req.query.status || 'active');
   let query = {};
   if (statusFilter !== 'all') {
     query.status = statusFilter;
   }
-    
+
     // If tutor is requesting, only show students from their center
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (tutor && tutor.assignedCenter) {
-        query.assignedCenter = tutor.assignedCenter;
+      if (!tutor || !tutor.assignedCenter) {
+        return res.json([]);
       }
+      query.assignedCenter = tutor.assignedCenter;
     }
 
     const students = await Student.find(query)
@@ -555,7 +556,17 @@ export const deleteStudent = async (req, res) => {
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
-    if(student.status === 'inactive') { 
+
+    // If tutor is deleting, they must belong to the same center as the student
+    if (req.role === 'tutor') {
+      const tutor = await Tutor.findById(req.user._id);
+      if (!tutor || !tutor.assignedCenter ||
+          student.assignedCenter.toString() !== tutor.assignedCenter.toString()) {
+        return res.status(403).json({ message: 'Not authorized to delete this student' });
+      }
+    }
+
+    if(student.status === 'inactive') {
     // Remove student from center's students array
     await Center.findByIdAndUpdate(student.assignedCenter, { $pull: { students: student._id } });
 
@@ -578,14 +589,32 @@ export const markDailyAttendance = async (req, res) => {
       return res.status(400).json({ message: "date and students array are required" });
     }
 
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ message: "date must be in YYYY-MM-DD format" });
+    }
+
     const month = date.slice(0, 7); // "YYYY-MM"
     const results = [];
+
+    // Tutors may only mark attendance for students of their own center
+    let tutorCenterId = null;
+    if (req.role === 'tutor') {
+      const tutor = await Tutor.findById(req.user._id);
+      if (!tutor || !tutor.assignedCenter) {
+        return res.status(403).json({ message: 'No center assigned to this tutor' });
+      }
+      tutorCenterId = tutor.assignedCenter.toString();
+    }
 
     for (const { studentId, status } of students) {
       try {
         const student = await Student.findById(studentId);
         if (!student) {
           results.push({ studentId, status: "Student not found" });
+          continue;
+        }
+        if (tutorCenterId && student.assignedCenter.toString() !== tutorCenterId) {
+          results.push({ studentId, status: "Not authorized" });
           continue;
         }
 

@@ -138,12 +138,14 @@ router.route('/')
   .post(checkPermission('tutors', 'write'), createActivityLogger('CREATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), tutorValidation, validateRequest, createTutor);
 
 router.route('/:id')
-  .get(checkPermission('tutors', 'read'), getTutor)
+  // Tutors may read only their own record (enforced in getTutor)
+  .get(checkPermission('tutors', 'read', { allowTutor: true }), getTutor)
   .put(checkPermission('tutors', 'write'), createActivityLogger('UPDATE_TUTOR', 'Tutor'), upload.fields(tutorUploadFields), updateValidation, validateRequest, updateTutor)
   .delete(checkPermission('tutors', 'write'), createActivityLogger('DELETE_TUTOR', 'Tutor'), deleteTutor);
 
 // Get tutors by center
-router.get('/center/:centerId', checkPermission('tutors', 'read'), getTutorsByCenter);
+// Tutors may list only their own center (enforced in getTutorsByCenter)
+router.get('/center/:centerId', checkPermission('tutors', 'read', { allowTutor: true }), getTutorsByCenter);
 
 // Report routes
 router.get('/:id/attendance', checkPermission('tutors', 'read'), getTutorAttendanceReport);

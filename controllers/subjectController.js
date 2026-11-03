@@ -3,6 +3,11 @@ import Student from '../models/Student.js';
 import Tutor from '../models/Tutor.js';
 import StudentSubject from '../models/StudentSubject.js';
 
+const getTutorCenterId = async (tutorId) => {
+    const tutor = await Tutor.findById(tutorId).select('assignedCenter');
+    return tutor?.assignedCenter ? tutor.assignedCenter.toString() : null;
+};
+
 // Add new subject
 export const addSubject = async (req, res) => {
     try {
@@ -65,11 +70,19 @@ export const addStudentsToSubject = async (req, res, next) => {
       return res.status(404).json("Subject not found");
     }
 
-    // Validate all students exist
+    const tutorCenterId = req.role === 'tutor' ? await getTutorCenterId(req.user._id) : null;
+    if (req.role === 'tutor' && !tutorCenterId) {
+      return res.status(403).json("No center assigned to this tutor");
+    }
+
+    // Validate all students exist (and, for tutors, belong to their center)
     for (const studentId of studentIds) {
       const student = await Student.findById(studentId);
       if (!student) {
         return res.status(404).json(`Student with ID ${studentId} not found`);
+      }
+      if (tutorCenterId && student.assignedCenter.toString() !== tutorCenterId) {
+        return res.status(403).json(`Not authorized for student ${studentId}`);
       }
     }
 
@@ -121,6 +134,16 @@ export const removeStudentFromSubject= async (req, res) => {
         const subject = await Subject.findById(id);
         if (!subject) {
             return res.status(404).json("Subject not found");
+        }
+        // Tutors may only remove students of their own center
+        if (req.role === 'tutor') {
+            const tutorCenterId = await getTutorCenterId(req.user._id);
+            const outsideCount = tutorCenterId
+                ? await Student.countDocuments({ _id: { $in: studentIds }, assignedCenter: { $ne: tutorCenterId } })
+                : studentIds.length;
+            if (outsideCount > 0) {
+                return res.status(403).json("Not authorized to remove these students");
+            }
         }
         // Remove students
         subject.students = subject.students.filter(studentId => !studentIds.includes(studentId.toString()));
