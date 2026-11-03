@@ -667,10 +667,19 @@ export const markDailyAttendance = async (req, res) => {
 
           record.days = Array.isArray(record.days) ? record.days : [];
 
-          // If today's attendance already recorded -> skip this student
-          const alreadyRecorded = record.days.some(d => d.date === date);
-          if (alreadyRecorded) {
-            results.push({ studentId, status: "Already marked" });
+          // If today's attendance already recorded: allow Absent -> Present (a student who
+          // arrived late), otherwise skip. Never downgrade Present to Absent here.
+          const existingDay = record.days.find(d => d.date === date);
+          if (existingDay) {
+            if (existingDay.status === "Absent" && status === "Present") {
+              existingDay.status = "Present";
+              record.presentDays = (typeof record.presentDays === "number" ? record.presentDays : 0) + 1;
+              student.attendance[monthIndex] = record;
+              await student.save();
+              results.push({ studentId, status: "Attendance marked" });
+            } else {
+              results.push({ studentId, status: "Already marked" });
+            }
             continue;
           }
 
