@@ -105,7 +105,7 @@ export const sendHadiyaPaymentEmail = async ({ to, tutorName, month, year, amoun
  * @param {string} options.to - Recipient email address
  * @param {string} options.tutorName - Tutor's name
  * @param {string} options.guestName - Guest tutor name
- * @param {string} options.pin - 4-digit login pin
+ * @param {string} options.pin - 6-digit login pin
  * @param {Date}  options.startDate - Leave start date
  * @param {Date}  options.endDate - Leave end date
  */

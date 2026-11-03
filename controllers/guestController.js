@@ -3,6 +3,7 @@ import Tutor from '../models/Tutor.js';
 import asyncHandler from 'express-async-handler';
 import emailService from '../utils/emailService.js';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import Center from '../models/Center.js';
 import Attendance from '../models/Attendance.js';
 import AttendanceButton from '../models/AttendanceButton.js';
@@ -92,8 +93,8 @@ export const approveGuestRequest = asyncHandler(async (req, res) => {
         return res.status(404).json({ success: false, error: 'Request not found' });
     }
 
-    // Generate a single 4-digit PIN valid for the whole date range
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    // Generate a single 6-digit PIN valid for the whole date range (crypto RNG, not Math.random)
+    const pin = crypto.randomInt(100000, 1000000).toString();
 
     // Build an array entry for each date in the range (same pin)
     const start = new Date(request.dateRange.startDate);
