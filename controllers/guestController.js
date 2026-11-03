@@ -8,6 +8,7 @@ import Center from '../models/Center.js';
 import Attendance from '../models/Attendance.js';
 import AttendanceButton from '../models/AttendanceButton.js';
 import { isWithinRadius, calculateDistance } from '../utils/geoUtils.js';
+import { istToday } from '../utils/istTime.js';
 
 // @desc    Submit a guest tutor request
 // @route   POST /api/guest/request
@@ -219,8 +220,7 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
             return res.status(400).json({ message: 'Attendance disabled by Admin' });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = istToday(); // IST calendar day (server clock is UTC)
 
         // Check if attendance already marked for today
         const existingAttendance = await Attendance.findOne({ tutor: tutor._id, date: today });

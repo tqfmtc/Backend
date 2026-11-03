@@ -11,6 +11,7 @@ const getFilePath = (files, field) => files[field] && files[field][0] ? files[fi
 const getFilePaths = (files, field) => files[field] ? files[field].map(f => f.path.replace(/\\/g, '/')) : null;
 
 import mongoose from 'mongoose';  
+import { istToday, istDayOfWeek } from '../utils/istTime.js';
 
 // @desc    Get all tutors
 // @route   GET /api/tutors
@@ -591,11 +592,11 @@ export const submitAttendance = async (req, res) => {
       });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Calendar day and weekday in IST (the server clock is UTC)
+    const today = istToday();
 
-    // Check if it's Sunday (0 is Sunday in JavaScript's getDay())
-    if (today.getDay() === 0) {
+    // Check if it's Sunday (0 is Sunday)
+    if (istDayOfWeek() === 0) {
       return res.status(400).json({
         message: 'Attendance cannot be submitted on Sundays as it is a weekly off day.'
       });
