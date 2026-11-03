@@ -3,6 +3,14 @@ import Student from '../models/Student.js';
 import Subject from '../models/Subject.js';
 import mongoose from 'mongoose';
 
+// Tutors may only touch students in their own center; other roles are checked by the route
+const tutorCanAccessStudent = async (req, studentId) => {
+  if (req.role !== 'tutor') return true;
+  if (!req.user.assignedCenter) return false;
+  const student = await Student.findById(studentId).select('assignedCenter').lean();
+  return !!student && String(student.assignedCenter) === String(req.user.assignedCenter);
+};
+
 export const createStudentSubjectRecord = async (req, res) => {
   try {
     const { studentId, subjectId } = req.body;
@@ -48,6 +56,9 @@ export const addMarksToStudentSubject = async (req, res) => {
 
     if (!record) {
       return res.status(404).json("StudentSubject record not found");
+    }
+    if (!(await tutorCanAccessStudent(req, record.student))) {
+      return res.status(403).json("Not authorized for this student");
     }
 
     // Push new marks and save
@@ -106,6 +117,9 @@ export const updateStudentSubjectRecord = async (req, res) => {
     if (!record) {
       return res.status(404).json("StudentSubject record not found");
     }
+    if (!(await tutorCanAccessStudent(req, record.student))) {
+      return res.status(403).json("Not authorized for this student");
+    }
 
     const { marksPercentage } = req.body;
     if (marksPercentage !== undefined) {
@@ -130,6 +144,9 @@ export const deleteMarksFromStudentSubject = async (req, res) => {
     const record = await StudentSubject.findById(subjectObjectId);
     if (!record) {
       return res.status(404).json("StudentSubject record not found");
+    }
+    if (!(await tutorCanAccessStudent(req, record.student))) {
+      return res.status(403).json("Not authorized for this student");
     }
     // Remove the mark entry by its _id
     record.marksPercentage = record.marksPercentage.filter(mark => mark._id.toString() !== markObjectId.toString());
@@ -169,6 +186,9 @@ export const getSubjectsByStudent = async (req, res) => {
       return res.status(400).json("studentId is required");
     }
     const studentObjectId = new mongoose.Types.ObjectId(studentId);
+    if (!(await tutorCanAccessStudent(req, studentObjectId))) {
+      return res.status(403).json("Not authorized for this student");
+    }
 
     const records = await StudentSubject.find({ student: studentObjectId })
       .populate('subject', 'subjectName')
