@@ -325,21 +325,12 @@ export const updateTutor = async (req, res) => {
       await newCenter.save();
     }
 
-    // Compute information completeness for status
-    const currentTutorData = { ...tutor.toObject(), ...updateData };
-    const isInformationComplete = Boolean(
-      currentTutorData.name &&
-        currentTutorData.email &&
-        currentTutorData.phone &&
-        currentTutorData.address &&
-        currentTutorData.assignedCenter &&
-        currentTutorData.subjects &&
-        currentTutorData.subjects.length > 0 &&
-        currentTutorData.sessionType &&
-        currentTutorData.sessionTiming
-    );
-
-    updateData.status = isInformationComplete ? 'active' : 'inactive';
+    // Status changes only when the admin sets it explicitly. (It used to be recomputed from
+    // profile completeness on every edit, which reactivated soft-deleted tutors and made
+    // incomplete ones inactive, so their next delete became permanent.)
+    if (['active', 'inactive'].includes(req.body.status)) {
+      updateData.status = req.body.status;
+    }
 
     // Apply base update
     await Tutor.updateOne({ _id: tutor._id }, { $set: updateData });
