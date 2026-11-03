@@ -3,6 +3,7 @@ import AttendanceButton from '../models/AttendanceButton.js';
 import Tutor from '../models/Tutor.js';
 import Center from '../models/Center.js';
 import { startOfMonth, endOfMonth, format, eachDayOfInterval } from 'date-fns';
+import { istToday, istTodayBounds, formatIstTime } from '../utils/istTime.js';
 
 //Toggle attendance button
 export const toggleAttendanceButton=async(req,res)=>{
@@ -126,10 +127,7 @@ export const  markAttendance = async (req, res) => {
 
 
 export const todayAttendance=async(req,res)=>{
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
+  const { start: startOfToday, end: endOfToday } = istTodayBounds();
   try{
     if(req.role=='admin'){
       const today = await Attendance.find({
@@ -167,10 +165,8 @@ export const getRecentAttendance = async (req, res) => {
     } else if (req.role === 'tutor') {
       // Tutor: return only today's attendance for this tutor
       const tutorId = req.user._id;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
+      const today = istToday();
+      const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
       const recent = await Attendance.find({
         tutor: tutorId,
         date: { $gte: today, $lt: tomorrow }
@@ -269,11 +265,7 @@ export const getAttendanceReport = async (req, res) => {
       const dateStr = format(new Date(doc.date), 'yyyy-MM-dd');
       if (!timestampMap[tutorId]) timestampMap[tutorId] = {};
       if (doc.createdAt) {
-        const h = doc.createdAt.getHours();
-        const m = doc.createdAt.getMinutes();
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 || 12;
-        timestampMap[tutorId][dateStr] = `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+        timestampMap[tutorId][dateStr] = formatIstTime(doc.createdAt);
       }
     });
 
@@ -406,12 +398,7 @@ export const getTutorMonthlyCoordinates = async (req, res) => {
       const dStr = format(new Date(doc.date), 'yyyy-MM-dd');
       if (!tsMap[tid]) tsMap[tid] = {};
       if (doc.createdAt) {
-        const createdAt = doc.createdAt;
-        const hours = createdAt.getHours();
-        const minutes = createdAt.getMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const h12 = hours % 12 || 12;
-        tsMap[tid][dStr] = `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`;
+        tsMap[tid][dStr] = formatIstTime(doc.createdAt);
       }
     });
 
@@ -531,12 +518,7 @@ export const getTutorCoordinatesRange = async (req, res) => {
       const dStr = format(new Date(doc.date), 'yyyy-MM-dd');
       if (!rangeTimestampMap[tid]) rangeTimestampMap[tid] = {};
       if (doc.createdAt) {
-        const createdAt = doc.createdAt;
-        const hours = createdAt.getHours();
-        const minutes = createdAt.getMinutes();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const h12 = hours % 12 || 12;
-        rangeTimestampMap[tid][dStr] = `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`;
+        rangeTimestampMap[tid][dStr] = formatIstTime(doc.createdAt);
       }
     });
 

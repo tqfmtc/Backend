@@ -20,6 +20,10 @@ import studentSubjectRoutes from './routes/studentSubjectRoutes.js';
 // Load env vars
 dotenv.config();
 
+// Stored attendance dates are UTC midnight and are formatted with the process clock,
+// so keep the process on UTC. India-time logic lives in utils/istTime.js.
+process.env.TZ = 'UTC';
+
 // Connect to database
 connectDB();
 

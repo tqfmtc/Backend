@@ -423,7 +423,7 @@ export const getActivityStats = async (req, res) => {
             .map(activity => ({
               admin: activity.admin,
               description: activity.description,
-              time: new Date(activity.timestamp).toLocaleString()
+              time: new Date(activity.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
             }))
         })),
         
@@ -438,7 +438,7 @@ export const getActivityStats = async (req, res) => {
               .slice(0, 5)
               .map(activity => ({
                 description: activity.description,
-                time: new Date(activity.timestamp).toLocaleString()
+                time: new Date(activity.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
               }))
           })),
         
@@ -458,7 +458,7 @@ export const getActivityStats = async (req, res) => {
               .map(activity => ({
                 admin: activity.admin,
                 description: activity.description,
-                time: new Date(activity.timestamp).toLocaleTimeString()
+                time: new Date(activity.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })
               }))
           })),
         
