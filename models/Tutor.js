@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import passwordChangedAt from './plugins/passwordChangedAt.js';
 import bcrypt from 'bcryptjs';
 
 const tutorSchema = mongoose.Schema(
@@ -217,6 +218,8 @@ tutorSchema.pre('save', async function(next) {
 tutorSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+tutorSchema.plugin(passwordChangedAt);
 
 const Tutor = mongoose.model('Tutor', tutorSchema);
 

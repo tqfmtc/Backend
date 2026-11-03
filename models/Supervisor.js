@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import passwordChangedAt from './plugins/passwordChangedAt.js';
 import bcrypt from 'bcryptjs';
 
 const supervisorSchema = new mongoose.Schema({
@@ -99,6 +100,8 @@ supervisorSchema.pre('save', async function(next) {
 supervisorSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+supervisorSchema.plugin(passwordChangedAt);
 
 const Supervisor = mongoose.model('Supervisor', supervisorSchema);
 
