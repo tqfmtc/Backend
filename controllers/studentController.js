@@ -537,10 +537,23 @@ export const changeAssignedCenter = async (req, res) => {
       });
     }
 
+    const oldCenterId = student.assignedCenter;
+    const oldTutorId = student.assignedTutor;
+
     // Update student's assigned center and tutor
     student.assignedCenter = assignedCenterId;
     student.assignedTutor = assignedTutorId;
     await student.save();
+
+    // Keep the center and tutor student lists in sync (per-center counts read from them)
+    if (oldCenterId && oldCenterId.toString() !== assignedCenterId) {
+      await Center.updateOne({ _id: oldCenterId }, { $pull: { students: student._id } });
+    }
+    if (oldTutorId && oldTutorId.toString() !== assignedTutorId) {
+      await Tutor.updateOne({ _id: oldTutorId }, { $pull: { students: student._id } });
+    }
+    await Center.updateOne({ _id: assignedCenterId }, { $addToSet: { students: student._id } });
+    await Tutor.updateOne({ _id: assignedTutorId }, { $addToSet: { students: student._id } });
 
     // Populate the response with center and tutor details
     const updatedStudent = await Student.findById(student._id)
