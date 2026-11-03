@@ -113,9 +113,13 @@ export const generatePasswordResetToken = async (req, res) => {
 export const passwordReset = async (req, res) => {
     try {
         const { newPassword } = req.body;
+        if (typeof newPassword !== 'string' || newPassword.length < 8) {
+            return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+        }
         const reqTokenNumber = req.params.token;
         const token = await PasswordResetToken.findOne({ token: reqTokenNumber });
-        if (!token) {
+        // Mongo's TTL cleanup can lag by up to a minute or more, so check the age explicitly
+        if (!token || Date.now() - token.createdAt > 60 * 60 * 1000) {
             return res.status(400).json({ message: 'Invalid or expired token' });
         }
         const tutorId = token.tutorId;
@@ -152,12 +156,7 @@ export const passwordReset = async (req, res) => {
                     <div style="background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
                         <h2 style="color: #2c3e50; text-align: center; margin-bottom: 20px;">Password Reset Successful</h2>
                         <p style="color: #34495e; margin-bottom: 15px;">Dear ${tutor.name},</p>
-                        <p style="color: #34495e; margin-bottom: 20px;">Your password has been successfully reset. Here are your new login credentials:</p>
-                        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
-                            <p style="color: #34495e; margin-bottom: 5px;"><strong>Phone Number:</strong> ${tutor.phone}</p>
-                            <p style="color: #34495e; margin-bottom: 5px;"><strong>New Password:</strong> ${newPassword}</p>
-                        </div>
-                        <p style="color: #34495e; margin-bottom: 20px;">You can now log in with these details using the "Login" option on our website.</p>
+                        <p style="color: #34495e; margin-bottom: 20px;">Your password has been successfully reset. You can now log in with your phone number (${tutor.phone}) and the new password you just set, using the "Login" option on our website.</p>
                         <div style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
                             <p style="color: #e74c3c; margin: 0;">If you did not initiate this change, please contact Admin or Sadar immediately.</p>
                         </div>
