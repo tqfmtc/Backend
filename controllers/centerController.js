@@ -186,10 +186,14 @@ export const deleteCenter = async (req, res) => {
       );
     }
 
-    // Find and delete all students associated with this center
+    // Deactivate (never delete) the center's students: their records, attendance and
+    // marks must survive a center being removed, and can be reassigned later
     const Student = (await import('../models/Student.js')).default;
-    const deletedStudentsResult = await Student.deleteMany({ assignedCenter: center._id });
-    console.log(`Deleted ${deletedStudentsResult.deletedCount} students associated with center ${center._id}`);
+    const deactivatedStudentsResult = await Student.updateMany(
+      { assignedCenter: center._id },
+      { $set: { status: 'inactive' } }
+    );
+    console.log(`Deactivated ${deactivatedStudentsResult.modifiedCount} students associated with center ${center._id}`);
 
     // Remove center references from any tutors assigned to this center
     const tutorsUpdated = await Tutor.updateMany(
@@ -203,7 +207,7 @@ export const deleteCenter = async (req, res) => {
     
     res.json({ 
       message: 'Center removed successfully', 
-      studentsDeleted: deletedStudentsResult.deletedCount,
+      studentsDeactivated: deactivatedStudentsResult.modifiedCount,
       tutorsUpdated: tutorsUpdated.modifiedCount
     });
   } else {
