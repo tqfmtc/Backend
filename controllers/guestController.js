@@ -5,6 +5,7 @@ import emailService from '../utils/emailService.js';
 import jwt from 'jsonwebtoken';
 import Center from '../models/Center.js';
 import Attendance from '../models/Attendance.js';
+import AttendanceButton from '../models/AttendanceButton.js';
 import { isWithinRadius, calculateDistance } from '../utils/geoUtils.js';
 
 // @desc    Submit a guest tutor request
@@ -210,6 +211,11 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
         if (!withinRange) {
             const dist = calculateDistance(guestLat, guestLon, centerLat, centerLon);
             return res.status(400).json({ message: 'You must be within 50 meters of the center to submit attendance', distance: dist });
+        }
+
+        const attendanceButton = await AttendanceButton.findOne();
+        if (attendanceButton && attendanceButton.status === false) {
+            return res.status(400).json({ message: 'Attendance disabled by Admin' });
         }
 
         const today = new Date();

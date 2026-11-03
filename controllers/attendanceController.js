@@ -34,7 +34,8 @@ export const buttonStatus=async(req,res)=>{
   try{
     let button=await AttendanceButton.findOne();
     if(!button){
-      return res.status(200).json({status:false,message:"Button not set, defaulting to false"});
+      // Match the schema default and submitAttendance: no document means enabled
+      return res.status(200).json({status:true,message:"Button not set, defaulting to enabled"});
     }
     res.status(200).json({status:button.status});
   }
