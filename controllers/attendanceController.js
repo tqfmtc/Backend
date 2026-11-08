@@ -5,6 +5,64 @@ import Center from '../models/Center.js';
 import { startOfMonth, endOfMonth, format, eachDayOfInterval } from 'date-fns';
 import { istToday, istTodayBounds, formatIstTime } from '../utils/istTime.js';
 
+// Reports have one row per tutor per center: each center the tutor is assigned to, plus any
+// other center they have attendance at in the range (e.g. one they were moved away from).
+// Returns [{ _id, name }], filtered to centerId when given.
+const reportCenters = (tutor, inRange, centerId) => {
+  const centers = new Map();
+  for (const a of tutor.assignments || []) {
+    if (a.center) centers.set(String(a.center._id ?? a.center), a.center.name || 'N/A');
+  }
+  for (const r of tutor.attendance || []) {
+    const id = r.center && String(r.center);
+    if (id && !centers.has(id) && inRange(new Date(r.date))) centers.set(id, r.centerName || 'N/A');
+  }
+  let rows = [...centers].map(([_id, name]) => ({ _id, name }));
+  if (centerId) rows = rows.filter(c => c._id === String(centerId));
+  // Keep tutors with no center visible in the unfiltered report
+  if (!rows.length && !centerId) rows = [{ name: 'N/A' }];
+  return rows;
+};
+
+// Tutors for a report: those assigned to centerId or with attendance there
+const reportTutorQuery = (centerId) => {
+  const query = { status: { $in: ['active', 'pending'] } };
+  if (centerId) query.$or = [{ 'assignments.center': centerId }, { 'attendance.center': centerId }];
+  return query;
+};
+
+// "tutorId:centerId" -> 'yyyy-MM-dd' -> IST "h:mm AM/PM" of when the record was created
+const buildTimestampMap = (attendanceDocs) => {
+  const map = {};
+  attendanceDocs.forEach(doc => {
+    if (!doc.createdAt) return;
+    const key = `${doc.tutor}:${doc.center}`;
+    if (!map[key]) map[key] = {};
+    map[key][format(new Date(doc.date), 'yyyy-MM-dd')] = formatIstTime(doc.createdAt);
+  });
+  return map;
+};
+
+// Present attendance points for one tutor at one center within the range
+const attendancePoints = (tutor, center, inRange, times) => {
+  const points = [];
+  tutor.attendance.forEach(record => {
+    const recordDate = new Date(record.date);
+    if (
+      inRange(recordDate) &&
+      String(record.center) === String(center._id) &&
+      record.status === 'present' &&
+      record.location &&
+      Array.isArray(record.location.coordinates)
+    ) {
+      const [lng, lat] = record.location.coordinates; // GeoJSON order is [lng, lat]
+      const dateStr = format(recordDate, 'yyyy-MM-dd');
+      points.push({ date: dateStr, time: times[dateStr] || null, lat, lng, status: record.status });
+    }
+  });
+  return points;
+};
+
 //Toggle attendance button
 export const toggleAttendanceButton=async(req,res)=>{
   try{
@@ -86,24 +144,23 @@ export const  markAttendance = async (req, res) => {
       status: status,
       markedBy: adminId
     });
-    // Upsert: there is a unique index on (tutor, date), so re-marking a day must
+    // Upsert: there is a unique index on (tutor, center, date), so re-marking a day must
     // correct the existing record instead of creating a second one
     const attendanceDoc = await Attendance.findOneAndUpdate(
-      { tutor: tutor._id, date: recordDate },
-      { $set: { center: center._id, status: status, markedBy: adminId } },
+      { tutor: tutor._id, center: center._id, date: recordDate },
+      { $set: { status: status, markedBy: adminId } },
       { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
     );
 
-    // Keep the embedded copy in sync: update that day's entry, or add it
+    // Keep the embedded copy in sync: update that day's entry for this center, or add it
     const existingIndex = tutor.attendance.findIndex(
-      r => r.date && r.date.getTime() === recordDate.getTime()
+      r => r.date && r.date.getTime() === recordDate.getTime() && String(r.center) === String(center._id)
     );
     if (existingIndex === -1) {
       tutor.attendance.push({ ...attendanceRecord, createdAt: attendanceDoc.createdAt });
     } else {
       const existing = tutor.attendance[existingIndex];
       existing.status = status;
-      existing.center = center._id;
       existing.centerName = center.name;
       existing.markedBy = adminId;
     }
@@ -160,7 +217,7 @@ export const getRecentAttendance = async (req, res) => {
         .populate('center', 'name');
       return res.json(recent);
     } else if (req.role === 'tutor') {
-      // Tutor: return only today's attendance for this tutor
+      // Tutor: return only today's attendance for this tutor (one record per center)
       const tutorId = req.user._id;
       const today = istToday();
       const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
@@ -169,7 +226,6 @@ export const getRecentAttendance = async (req, res) => {
         date: { $gte: today, $lt: tomorrow }
       })
         .sort({ createdAt: -1 })
-        .limit(1)
         .populate('tutor', 'name')
         .populate('center', 'name');
       return res.json(recent);
@@ -245,26 +301,13 @@ export const getAttendanceReport = async (req, res) => {
     const rangeEndDate   = endOfMonth(new Date(endYear, endMonth - 1, 1));
 
     // Get all tutors (optionally filtered by center)
-    const tutorQuery = centerId
-      ? { assignedCenter: centerId, status: { $in: ['active', 'pending'] } }
-      : { status: { $in: ['active', 'pending'] } };
-    const tutors = await Tutor.find(tutorQuery).populate('assignedCenter', 'name');
+    const tutors = await Tutor.find(reportTutorQuery(centerId)).populate('assignments.center', 'name');
+    const inRange = (d) => d >= rangeStartDate && d <= rangeEndDate;
 
     // Fetch Attendance docs for the full range to get real createdAt timestamps
     const attendanceDocsQuery = { date: { $gte: rangeStartDate, $lte: rangeEndDate } };
     if (centerId) attendanceDocsQuery.center = centerId;
-    const attendanceDocs = await Attendance.find(attendanceDocsQuery);
-
-    // Build lookup: tutorId -> dateString -> 12h time string
-    const timestampMap = {};
-    attendanceDocs.forEach(doc => {
-      const tutorId = doc.tutor.toString();
-      const dateStr = format(new Date(doc.date), 'yyyy-MM-dd');
-      if (!timestampMap[tutorId]) timestampMap[tutorId] = {};
-      if (doc.createdAt) {
-        timestampMap[tutorId][dateStr] = formatIstTime(doc.createdAt);
-      }
-    });
+    const timestampMap = buildTimestampMap(await Attendance.find(attendanceDocsQuery));
 
     // Generate every calendar day in the range
     const allDaysInRange = eachDayOfInterval({ start: rangeStartDate, end: rangeEndDate });
@@ -289,15 +332,15 @@ export const getAttendanceReport = async (req, res) => {
       return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
     };
 
-    // Build report for each tutor
-    const report = tutors.map(tutor => {
-      const tutorIdStr = tutor._id.toString();
+    // Build report rows: one per tutor per center
+    const report = tutors.flatMap(tutor => reportCenters(tutor, inRange, centerId).map(center => {
+      const times = timestampMap[`${tutor._id}:${center._id}`] || {};
 
-      // Quick lookup from embedded attendance records
+      // Quick lookup from embedded attendance records at this center
       const tutorAttendanceLookup = {};
       tutor.attendance.forEach(record => {
         const recordDate = new Date(record.date);
-        if (recordDate >= rangeStartDate && recordDate <= rangeEndDate) {
+        if (inRange(recordDate) && String(record.center) === String(center._id)) {
           tutorAttendanceLookup[format(recordDate, 'yyyy-MM-dd')] = record.status === 'present';
         }
       });
@@ -307,14 +350,12 @@ export const getAttendanceReport = async (req, res) => {
       allDaysInRange.forEach(day => {
         const dayStr = format(day, 'yyyy-MM-dd');
         const present = tutorAttendanceLookup[dayStr] || false;
-        const time = present && timestampMap[tutorIdStr]?.[dayStr]
-          ? timestampMap[tutorIdStr][dayStr]
-          : null;
+        const time = present && times[dayStr] ? times[dayStr] : null;
         dailyAttendance[dayStr] = { present, time };
       });
 
       // Average mark time across all present days in the range
-      const allTimes = Object.values(timestampMap[tutorIdStr] || {});
+      const allTimes = Object.values(times);
       let avgMarkTime = null;
       if (allTimes.length > 0) {
         const minuteVals = allTimes.map(parseTimeToMinutes).filter(v => v !== null);
@@ -324,18 +365,13 @@ export const getAttendanceReport = async (req, res) => {
         }
       }
 
-      let centerInfo = { name: 'N/A' };
-      if (tutor.assignedCenter?.name) {
-        centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
-      }
-
       return {
         tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
-        center: centerInfo,
+        center,
         attendance: dailyAttendance,
         avgMarkTime
       };
-    });
+    }));
 
     res.status(200).json(report);
   } catch (error) {
@@ -372,65 +408,28 @@ export const getTutorMonthlyCoordinates = async (req, res) => {
     const monthStartDate = startOfMonth(new Date(numericYear, numericMonth - 1, 1));
     const monthEndDate = endOfMonth(new Date(numericYear, numericMonth - 1, 1));
 
-    const query = { status: { $in: ['active', 'pending'] } };
-    if (centerId) {
-      query.assignedCenter = centerId;
-    }
+    const query = reportTutorQuery(centerId);
     if (tutorId) {
       query._id = tutorId;
     }
 
-    const tutors = await Tutor.find(query).populate('assignedCenter', 'name');
+    const tutors = await Tutor.find(query).populate('assignments.center', 'name');
+    const inRange = (d) => d >= monthStartDate && d <= monthEndDate;
 
     // Fetch Attendance docs for timestamps
     const attQuery = { date: { $gte: monthStartDate, $lte: monthEndDate } };
     if (tutorId) attQuery.tutor = tutorId;
     if (centerId) attQuery.center = centerId;
-    const attendanceDocs = await Attendance.find(attQuery);
+    const tsMap = buildTimestampMap(await Attendance.find(attQuery));
 
-    // Build timestamp lookup: tutorId -> dateStr -> 12h time string
-    const tsMap = {};
-    attendanceDocs.forEach(doc => {
-      const tid = doc.tutor.toString();
-      const dStr = format(new Date(doc.date), 'yyyy-MM-dd');
-      if (!tsMap[tid]) tsMap[tid] = {};
-      if (doc.createdAt) {
-        tsMap[tid][dStr] = formatIstTime(doc.createdAt);
-      }
-    });
-
-    const data = tutors.map(tutor => {
-      const tutorIdStr = tutor._id.toString();
-      const points = [];
-      tutor.attendance.forEach(record => {
-        const recordDate = new Date(record.date);
-        if (recordDate >= monthStartDate && recordDate <= monthEndDate && record.status === 'present' && record.location && Array.isArray(record.location.coordinates)) {
-          const [lng, lat] = record.location.coordinates; // GeoJSON order is [lng, lat]
-          const dateStr = format(recordDate, 'yyyy-MM-dd');
-          const timeStr = (tsMap[tutorIdStr] && tsMap[tutorIdStr][dateStr]) ? tsMap[tutorIdStr][dateStr] : null;
-          points.push({
-            date: dateStr,
-            time: timeStr,
-            lat,
-            lng,
-            status: record.status
-          });
-        }
-      });
-
-      let centerInfo = { name: 'N/A' };
-      if (tutor.assignedCenter && tutor.assignedCenter.name) {
-        centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
-      }
-
-      return {
-        tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
-        center: centerInfo,
-        month: numericMonth,
-        year: numericYear,
-        points
-      };
-    });
+    // One entry per tutor per center
+    const data = tutors.flatMap(tutor => reportCenters(tutor, inRange, centerId).map(center => ({
+      tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
+      center,
+      month: numericMonth,
+      year: numericYear,
+      points: attendancePoints(tutor, center, inRange, tsMap[`${tutor._id}:${center._id}`] || {})
+    })));
 
     res.status(200).json(data);
   } catch (error) {
@@ -490,15 +489,13 @@ export const getTutorCoordinatesRange = async (req, res) => {
     const rangeEndDate = endOfMonth(new Date(toNumYear, toNumMonth - 1, 1));
 
     // Build query for tutors
-    const query = { status: { $in: ['active', 'pending'] } };
-    if (centerId) {
-      query.assignedCenter = centerId;
-    }
+    const query = reportTutorQuery(centerId);
     if (tutorId) {
       query._id = tutorId;
     }
 
-    const tutors = await Tutor.find(query).populate('assignedCenter', 'name');
+    const tutors = await Tutor.find(query).populate('assignments.center', 'name');
+    const inRange = (d) => d >= rangeStartDate && d <= rangeEndDate;
 
     // Fetch Attendance docs for timestamps in the range
     const rangeAttQuery = {
@@ -506,56 +503,14 @@ export const getTutorCoordinatesRange = async (req, res) => {
     };
     if (tutorId) rangeAttQuery.tutor = tutorId;
     if (centerId) rangeAttQuery.center = centerId;
-    const rangeAttendanceDocs = await Attendance.find(rangeAttQuery);
+    const rangeTimestampMap = buildTimestampMap(await Attendance.find(rangeAttQuery));
 
-    // Build timestamp lookup: tutorId -> dateStr -> 12h time string
-    const rangeTimestampMap = {};
-    rangeAttendanceDocs.forEach(doc => {
-      const tid = doc.tutor.toString();
-      const dStr = format(new Date(doc.date), 'yyyy-MM-dd');
-      if (!rangeTimestampMap[tid]) rangeTimestampMap[tid] = {};
-      if (doc.createdAt) {
-        rangeTimestampMap[tid][dStr] = formatIstTime(doc.createdAt);
-      }
-    });
-
-    // Build consolidated data for all tutors in the date range
-    const data = tutors.map(tutor => {
-      const tutorIdStr = tutor._id.toString();
-      const points = [];
-      tutor.attendance.forEach(record => {
-        const recordDate = new Date(record.date);
-        // Include records that fall within the date range and have valid location data
-        if (
-          recordDate >= rangeStartDate &&
-          recordDate <= rangeEndDate &&
-          record.status === 'present' &&
-          record.location &&
-          Array.isArray(record.location.coordinates)
-        ) {
-          const [lng, lat] = record.location.coordinates; // GeoJSON order is [lng, lat]
-          const dateStr = format(recordDate, 'yyyy-MM-dd');
-          const timeStr = (rangeTimestampMap[tutorIdStr] && rangeTimestampMap[tutorIdStr][dateStr])
-            ? rangeTimestampMap[tutorIdStr][dateStr]
-            : null;
-          points.push({
-            date: dateStr,
-            time: timeStr,
-            lat,
-            lng,
-            status: record.status
-          });
-        }
-      });
-
-      let centerInfo = { name: 'N/A' };
-      if (tutor.assignedCenter && tutor.assignedCenter.name) {
-        centerInfo = { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name };
-      }
-
+    // Consolidated points across the date range, one entry per tutor per center
+    const data = tutors.flatMap(tutor => reportCenters(tutor, inRange, centerId).map(center => {
+      const points = attendancePoints(tutor, center, inRange, rangeTimestampMap[`${tutor._id}:${center._id}`] || {});
       return {
         tutor: { _id: tutor._id, name: tutor.name, phone: tutor.phone },
-        center: centerInfo,
+        center,
         dateRange: {
           from: { month: fromNumMonth, year: fromNumYear },
           to: { month: toNumMonth, year: toNumYear }
@@ -563,7 +518,7 @@ export const getTutorCoordinatesRange = async (req, res) => {
         totalPoints: points.length,
         points
       };
-    });
+    }));
 
     res.status(200).json(data);
   } catch (error) {
