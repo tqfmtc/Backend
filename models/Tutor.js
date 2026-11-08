@@ -181,16 +181,24 @@ const tutorSchema = mongoose.Schema(
         enum: ['present', 'absent'],
         required: true
       },
+      // Absent on admin-marked records. It must be missing rather than { type: 'Point' }
+      // without coordinates, which the 2dsphere index rejects ("Can't extract geo keys").
       location: {
-        type: {
-          type: String,
-          enum: ['Point'],
-          default: 'Point'
-        },
-        coordinates: {
-          type: [Number],
-          required: true
-        }
+        type: new mongoose.Schema(
+          {
+            type: {
+              type: String,
+              enum: ['Point'],
+              default: 'Point'
+            },
+            coordinates: {
+              type: [Number],
+              required: true
+            }
+          },
+          { _id: false }
+        ),
+        default: undefined
       },
       center: {
         type: mongoose.Schema.Types.ObjectId,
