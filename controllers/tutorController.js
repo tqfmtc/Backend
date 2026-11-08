@@ -3,7 +3,6 @@ import Center from '../models/Center.js';
 import Attendance from '../models/Attendance.js';
 import AttendanceButton from '../models/AttendanceButton.js';
 import bcrypt from 'bcryptjs';
-import { isWithinRadius, calculateDistance } from '../utils/geoUtils.js';
 import { queueAttendanceEmail } from '../utils/emailQueue.js';
 
 // Helper: get file path or null
@@ -12,7 +11,7 @@ const getFilePaths = (files, field) => files[field] ? files[field].map(f => f.pa
 
 import mongoose from 'mongoose';
 import { istToday, istDayOfWeek } from '../utils/istTime.js';
-import { tutorCenterIds, tutorHasCenter, assignmentsPopulate, parseAssignments } from '../utils/tutorCenters.js';
+import { tutorCenterIds, tutorHasCenter, assignmentsPopulate, parseAssignments, nearestAssignedCenter } from '../utils/tutorCenters.js';
 
 // Comma-separated names of a tutor's populated centers
 const centerNamesOf = (tutor) =>
@@ -548,14 +547,9 @@ export const getTutorStudentsReport = async (req, res) => {
 // @access  Private/Tutor
 export const submitAttendance = async (req, res) => {
   try {
-    const tutor = await Tutor.findById(req.user._id);
+    const tutor = await Tutor.findById(req.user._id).populate(assignmentsPopulate('name coordinates'));
     if (!tutor) {
       return res.status(404).json({ message: 'Tutor not found' });
-    }
-
-    const center = await Center.findById(tutor.assignedCenter);
-    if (!center) {
-      return res.status(404).json({ message: 'Assigned center not found' });
     }
 
     if (!req.body.currentLocation || !Array.isArray(req.body.currentLocation) || req.body.currentLocation.length !== 2) {
@@ -563,23 +557,21 @@ export const submitAttendance = async (req, res) => {
     }
 
     const [tutorLat, tutorLon] = req.body.currentLocation;
-    const [centerLat, centerLon] = center.coordinates;
 
-    const isWithinRange = isWithinRadius(
-      tutorLat,
-      tutorLon,
-      centerLat,
-      centerLon,
-      50
-    );
+    // Attendance counts for whichever of the tutor's centers they are at
+    const nearest = nearestAssignedCenter(tutor, tutorLat, tutorLon);
+    if (!nearest) {
+      return res.status(404).json({ message: 'Assigned center not found' });
+    }
+    const { center, distance } = nearest;
 
-    if (!isWithinRange) {
-      const distance = calculateDistance(tutorLat, tutorLon, centerLat, centerLon);
+    if (distance > 50) {
       return res.status(400).json({
         message: 'You must be within 50 meters of the center to submit attendance',
         distance: distance,
         tutorLocation: [tutorLat, tutorLon],
-        centerLocation: [centerLat, centerLon]
+        centerLocation: center.coordinates,
+        centerName: center.name
       });
     }
 
@@ -627,7 +619,7 @@ export const submitAttendance = async (req, res) => {
     }
 
     const existingAttendanceIndex = tutor.attendance.findIndex(
-      record => record.date.getTime() === today.getTime()
+      record => record.date.getTime() === today.getTime() && String(record.center) === String(center._id)
     );
 
     if (existingAttendanceIndex === -1) {
@@ -661,28 +653,32 @@ export const submitAttendance = async (req, res) => {
 export const getTutorCenter = async (req, res) => {
   try {
     const tutor = await Tutor.findById(req.user._id)
-      .populate('assignedCenter', 'name location coordinates area sadarName sadarContact');
+      .populate(assignmentsPopulate('name location coordinates area sadarName sadarContact'));
 
     if (!tutor) {
       return res.status(404).json({ message: 'Tutor not found' });
     }
 
-    if (!tutor.assignedCenter) {
+    const centers = tutor.assignments
+      .filter(a => a.center)
+      .map(({ center, sessionType, sessionTiming }) => ({
+        _id: center._id,
+        name: center.name,
+        location: center.location,
+        coordinates: center.coordinates,
+        area: center.area,
+        sadarName: center.sadarName,
+        sadarContact: center.sadarContact,
+        sessionType,
+        sessionTiming
+      }));
+
+    if (!centers.length) {
       return res.status(404).json({ message: 'No center assigned to this tutor' });
     }
 
-    res.json({
-      success: true,
-      center: {
-        _id: tutor.assignedCenter._id,
-        name: tutor.assignedCenter.name,
-        location: tutor.assignedCenter.location,
-        coordinates: tutor.assignedCenter.coordinates,
-        area: tutor.assignedCenter.area,
-        sadarName: tutor.assignedCenter.sadarName,
-        sadarContact: tutor.assignedCenter.sadarContact
-      }
-    });
+    // `center` is the first one, for clients that expect a single center
+    res.json({ success: true, centers, center: centers[0] });
   } catch (error) {
     console.error('Error getting tutor center:', error);
     res.status(500).json({ message: 'Error getting center information' });
@@ -695,21 +691,22 @@ export const getTutorCenter = async (req, res) => {
 export const getCenterLocation = async (req, res) => {
   try {
     const tutor = await Tutor.findById(req.body.tutorId)
-      .populate('assignedCenter', 'location coordinates');
-    
+      .populate(assignmentsPopulate('name coordinates'));
+
     if (!tutor) {
       return res.status(404).json({ message: 'Tutor not found' });
     }
 
-    if (!tutor.assignedCenter) {
+    const centers = tutor.assignments
+      .filter(a => a.center)
+      .map(({ center }) => ({ centerId: center._id, centerName: center.name, coordinates: center.coordinates }));
+
+    if (!centers.length) {
       return res.status(404).json({ message: 'No center assigned to this tutor' });
     }
 
-    res.json({
-      centerId: tutor.assignedCenter._id,
-      centerName: tutor.assignedCenter.name,
-      coordinates: tutor.assignedCenter.coordinates
-    });
+    // Top-level fields are the first center, for clients that expect a single center
+    res.json({ ...centers[0], centers });
   } catch (error) {
     console.error('Error getting center location:', error);
     res.status(500).json({ message: 'Error getting center location' });

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { SESSION_TYPES, SESSION_TIMINGS } from '../models/Tutor.js';
+import { calculateDistance } from './geoUtils.js';
 
 // Helpers for tutor.assignments ([{ center, sessionType, sessionTiming }]).
 // They accept populated or raw documents.
@@ -15,6 +16,18 @@ export const tutorHasCenter = (tutor, centerId) =>
 
 // Populate options for the assigned centers
 export const assignmentsPopulate = (select = 'name location') => ({ path: 'assignments.center', select });
+
+// The tutor's assigned center nearest to (lat, lon), as { center, distance } in meters,
+// or null if none has coordinates. Needs assignments.center populated with coordinates.
+export const nearestAssignedCenter = (tutor, lat, lon) => {
+  let nearest = null;
+  for (const { center } of tutor?.assignments || []) {
+    if (!Array.isArray(center?.coordinates) || center.coordinates.length !== 2) continue;
+    const distance = calculateDistance(lat, lon, center.coordinates[0], center.coordinates[1]);
+    if (!nearest || distance < nearest.distance) nearest = { center, distance };
+  }
+  return nearest;
+};
 
 // Single-center fields for clients built before tutors could have several centers
 // (mobile app <= 3.1.1 reads assignedCenter from the login response)

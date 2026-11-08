@@ -7,8 +7,8 @@ import crypto from 'crypto';
 import Center from '../models/Center.js';
 import Attendance from '../models/Attendance.js';
 import AttendanceButton from '../models/AttendanceButton.js';
-import { isWithinRadius, calculateDistance } from '../utils/geoUtils.js';
 import { istToday } from '../utils/istTime.js';
+import { assignmentsPopulate, nearestAssignedCenter } from '../utils/tutorCenters.js';
 
 // @desc    Submit a guest tutor request
 // @route   POST /api/guest/request
@@ -58,8 +58,8 @@ export const getMyGuestRequests = asyncHandler(async (req, res) => {
 export const getPendingGuestRequests = asyncHandler(async (req, res) => {
     const requests = await GuestRequest.find({ status: 'pending' }).populate({
         path: 'tutor',
-        select: 'name phone email assignedCenter',
-        populate: { path: 'assignedCenter', select: 'name' }
+        select: 'name phone email assignments',
+        populate: { path: 'assignments.center', select: 'name' }
     });
 
     res.status(200).json(requests);
@@ -77,8 +77,8 @@ export const getGuestRequests = asyncHandler(async (req, res) => {
 
     const requests = await GuestRequest.find(filter).populate({
         path: 'tutor',
-        select: 'name phone email assignedCenter',
-        populate: { path: 'assignedCenter', select: 'name' }
+        select: 'name phone email assignments',
+        populate: { path: 'assignments.center', select: 'name' }
     });
 
     res.status(200).json(requests);
@@ -159,13 +159,13 @@ export const guestLogin = asyncHandler(async (req, res) => {
     }
 
     // Fetch tutor to get center coordinates
-    const tutor = await Tutor.findById(request.tutor).populate('assignedCenter', 'coordinates');
-    let centerCoords = null;
-    let centerId = null;
-    if (tutor && tutor.assignedCenter) {
-        centerCoords = tutor.assignedCenter.coordinates;
-        centerId = tutor.assignedCenter._id;
-    }
+    const tutor = await Tutor.findById(request.tutor).populate(assignmentsPopulate('name coordinates'));
+    const centers = (tutor?.assignments || [])
+        .filter(a => a.center)
+        .map(({ center }) => ({ _id: center._id, name: center.name, coordinates: center.coordinates }));
+    // centerId/centerCoordinates are the first center, for clients that expect a single center
+    const centerCoords = centers[0]?.coordinates || null;
+    const centerId = centers[0]?._id || null;
 
     const token = jwt.sign(
         { id: request._id, role: 'guest', tutorId: tutor._id },
@@ -179,6 +179,7 @@ export const guestLogin = asyncHandler(async (req, res) => {
         tutorId: tutor._id,
         centerId,
         centerCoordinates: centerCoords,
+        centers,
         message: 'Login successful'
     });
 });
@@ -196,23 +197,21 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
             return res.status(400).json({ message: 'Invalid location data provided' });
         }
 
-        const tutor = await Tutor.findById(tutorId);
+        const tutor = await Tutor.findById(tutorId).populate(assignmentsPopulate('name coordinates'));
         if (!tutor) {
             return res.status(404).json({ message: 'Tutor not found' });
         }
 
-        const center = await Center.findById(tutor.assignedCenter);
-        if (!center) {
+        const [guestLat, guestLon] = currentLocation;
+
+        // The guest covers whichever of the tutor's centers they are at
+        const nearest = nearestAssignedCenter(tutor, guestLat, guestLon);
+        if (!nearest) {
             return res.status(404).json({ message: 'Assigned center not found' });
         }
-
-        const [guestLat, guestLon] = currentLocation;
-        const [centerLat, centerLon] = center.coordinates;
-
-        const withinRange = isWithinRadius(guestLat, guestLon, centerLat, centerLon, 50);
-        if (!withinRange) {
-            const dist = calculateDistance(guestLat, guestLon, centerLat, centerLon);
-            return res.status(400).json({ message: 'You must be within 50 meters of the center to submit attendance', distance: dist });
+        const { center, distance } = nearest;
+        if (distance > 50) {
+            return res.status(400).json({ message: 'You must be within 50 meters of the center to submit attendance', distance });
         }
 
         const attendanceButton = await AttendanceButton.findOne();
@@ -223,7 +222,7 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
         const today = istToday(); // IST calendar day (server clock is UTC)
 
         // Check if attendance already marked for today
-        const existingAttendance = await Attendance.findOne({ tutor: tutor._id, date: today });
+        const existingAttendance = await Attendance.findOne({ tutor: tutor._id, center: center._id, date: today });
         if (existingAttendance) {
             return res.status(409).json({ message: 'Attendance already marked for today' });
         }
@@ -239,7 +238,9 @@ export const submitGuestAttendance = asyncHandler(async (req, res) => {
         });
 
         // Update tutor embedded array
-        const existingIndex = tutor.attendance.findIndex(r => r.date.getTime() === today.getTime());
+        const existingIndex = tutor.attendance.findIndex(
+            r => r.date.getTime() === today.getTime() && String(r.center) === String(center._id)
+        );
         const attendanceRecord = {
             date: today,
             status: 'present',
