@@ -2,10 +2,11 @@ import Subject from '../models/Subject.js';
 import Student from '../models/Student.js';
 import Tutor from '../models/Tutor.js';
 import StudentSubject from '../models/StudentSubject.js';
+import { tutorCenterIds } from '../utils/tutorCenters.js';
 
-const getTutorCenterId = async (tutorId) => {
-    const tutor = await Tutor.findById(tutorId).select('assignedCenter');
-    return tutor?.assignedCenter ? tutor.assignedCenter.toString() : null;
+const getTutorCenterIds = async (tutorId) => {
+    const tutor = await Tutor.findById(tutorId).select('assignments');
+    return tutorCenterIds(tutor);
 };
 
 // Add new subject
@@ -70,18 +71,18 @@ export const addStudentsToSubject = async (req, res, next) => {
       return res.status(404).json("Subject not found");
     }
 
-    const tutorCenterId = req.role === 'tutor' ? await getTutorCenterId(req.user._id) : null;
-    if (req.role === 'tutor' && !tutorCenterId) {
+    const tutorCenters = req.role === 'tutor' ? await getTutorCenterIds(req.user._id) : null;
+    if (tutorCenters && !tutorCenters.length) {
       return res.status(403).json("No center assigned to this tutor");
     }
 
-    // Validate all students exist (and, for tutors, belong to their center)
+    // Validate all students exist (and, for tutors, belong to one of their centers)
     for (const studentId of studentIds) {
       const student = await Student.findById(studentId);
       if (!student) {
         return res.status(404).json(`Student with ID ${studentId} not found`);
       }
-      if (tutorCenterId && student.assignedCenter.toString() !== tutorCenterId) {
+      if (tutorCenters && !tutorCenters.includes(student.assignedCenter.toString())) {
         return res.status(403).json(`Not authorized for student ${studentId}`);
       }
     }
@@ -135,11 +136,11 @@ export const removeStudentFromSubject= async (req, res) => {
         if (!subject) {
             return res.status(404).json("Subject not found");
         }
-        // Tutors may only remove students of their own center
+        // Tutors may only remove students of their own centers
         if (req.role === 'tutor') {
-            const tutorCenterId = await getTutorCenterId(req.user._id);
-            const outsideCount = tutorCenterId
-                ? await Student.countDocuments({ _id: { $in: studentIds }, assignedCenter: { $ne: tutorCenterId } })
+            const tutorCenters = await getTutorCenterIds(req.user._id);
+            const outsideCount = tutorCenters.length
+                ? await Student.countDocuments({ _id: { $in: studentIds }, assignedCenter: { $nin: tutorCenters } })
                 : studentIds.length;
             if (outsideCount > 0) {
                 return res.status(403).json("Not authorized to remove these students");
@@ -205,8 +206,8 @@ export const getByCenter = async (req, res) => {
     try {
         const { id, centerId } = req.params;
 
-        // Tutors may only list students of their own center
-        if (req.role === 'tutor' && (await getTutorCenterId(req.user._id)) !== String(centerId)) {
+        // Tutors may only list students of their own centers
+        if (req.role === 'tutor' && !(await getTutorCenterIds(req.user._id)).includes(String(centerId))) {
             return res.status(403).json({ message: 'Not authorized for this center' });
         }
 

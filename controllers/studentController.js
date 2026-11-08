@@ -3,6 +3,10 @@ import Center from '../models/Center.js';
 import Tutor from '../models/Tutor.js';
 import Subject from '../models/Subject.js';
 import StudentSubject from '../models/StudentSubject.js';
+import { tutorCenterIds, tutorHasCenter } from '../utils/tutorCenters.js';
+
+// Tutors may only work with students of the centers they are assigned to
+const tutorOwnsStudent = (tutor, student) => !!tutor && tutorHasCenter(tutor, student.assignedCenter);
 
 // @desc    Get all students
 // @route   GET /api/students
@@ -18,13 +22,16 @@ export const getStudents = async (req, res) => {
     query.status = statusFilter;
   }
 
-    // If tutor is requesting, only show students from their center
+    // If tutor is requesting, only show students from their centers
+    // (or one of them, with ?centerId=)
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter) {
+      let centers = tutorCenterIds(tutor);
+      if (req.query.centerId) centers = centers.filter(id => id === String(req.query.centerId));
+      if (!centers.length) {
         return res.json([]);
       }
-      query.assignedCenter = tutor.assignedCenter;
+      query.assignedCenter = { $in: centers };
     }
 
     const students = await Student.find(query)
@@ -89,23 +96,14 @@ export const getStudent = async (req, res) => {
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
       console.log('👨‍🏫 Tutor found:', tutor?._id?.toString());
-      console.log('   tutor.assignedCenter:', tutor?.assignedCenter?.toString());
+      console.log('   tutor centers:', tutorCenterIds(tutor));
 
-      // Handle both populated and raw ObjectId cases
-      const studentCenterId = student.assignedCenter?._id
-        ? student.assignedCenter._id.toString()
-        : student.assignedCenter?.toString();
-      const tutorCenterId = tutor?.assignedCenter?.toString();
-
-      const centerMatch = studentCenterId === tutorCenterId;
-      console.log('🔍 Comparing centers →', studentCenterId, '===', tutorCenterId, '? →', centerMatch);
-
-      if (!tutor || !tutor.assignedCenter || !centerMatch) {
-        console.log('❌ Authorization failed - Not same center');
+      if (!tutorOwnsStudent(tutor, student)) {
+        console.log('❌ Authorization failed - Not one of the tutor\'s centers');
         return res.status(403).json({ message: 'Not authorized to access this student' });
       }
 
-      console.log('✅ Tutor and student belong to the same center');
+      console.log('✅ Student belongs to one of the tutor\'s centers');
     }
 
     console.log('--- 🎓 GET STUDENT DEBUG END ---');
@@ -151,15 +149,14 @@ export const createStudent = async (req, res) => {
       return res.status(404).json({ message: 'Center not found' });
     }
 
-    // If user is a tutor, they can only add students to their assigned center
+    // If user is a tutor, they can only add students to one of their assigned centers
     if (req.role === 'tutor') {
-      // Verify that the tutor belongs to the selected center
       const tutor = await Tutor.findById(req.user._id);
       if (!tutor) {
         return res.status(404).json({ message: 'Tutor not found' });
       }
-      if (!tutor.assignedCenter || tutor.assignedCenter.toString() !== assignedCenter) {
-        return res.status(403).json({ message: 'You can only add students to your assigned center' });
+      if (!tutorHasCenter(tutor, assignedCenter)) {
+        return res.status(403).json({ message: 'You can only add students to your assigned centers' });
       }
     }
   let assignedTutor;
@@ -322,12 +319,15 @@ export const updateStudent = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // If tutor is updating, they must belong to the same center as the student
+    // If tutor is updating, the student must be in one of their centers, and can
+    // only be moved to another of their centers
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter || 
-          student.assignedCenter.toString() !== tutor.assignedCenter.toString()) {
+      if (!tutorOwnsStudent(tutor, student)) {
         return res.status(403).json({ message: 'Not authorized to update this student' });
+      }
+      if (req.body.assignedCenter && !tutorHasCenter(tutor, req.body.assignedCenter)) {
+        return res.status(403).json({ message: 'You can only move students to your assigned centers' });
       }
     }
 
@@ -530,8 +530,8 @@ export const changeAssignedCenter = async (req, res) => {
       return res.status(404).json({ message: 'Tutor not found' });
     }
 
-    // Validate that the tutor belongs to the specified center
-    if (tutor.assignedCenter.toString() !== assignedCenterId) {
+    // Validate that the tutor is assigned to the specified center
+    if (!tutorHasCenter(tutor, assignedCenterId)) {
       return res.status(400).json({ 
         message: 'The specified tutor does not belong to the selected center. Please select a tutor assigned to this center.' 
       });
@@ -581,11 +581,10 @@ export const deleteStudent = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // If tutor is deleting, they must belong to the same center as the student
+    // If tutor is deleting, the student must be in one of their centers
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter ||
-          student.assignedCenter.toString() !== tutor.assignedCenter.toString()) {
+      if (!tutorOwnsStudent(tutor, student)) {
         return res.status(403).json({ message: 'Not authorized to delete this student' });
       }
     }
@@ -608,7 +607,9 @@ export const deleteStudent = async (req, res) => {
 
 export const markDailyAttendance = async (req, res) => {
   try {
-    const { date, students } = req.body;
+    // centerId (optional) limits the submission to one center's students, so a tutor
+    // with several centers can't mark another center's students by mistake
+    const { date, students, centerId } = req.body;
     if (!date || !Array.isArray(students)) {
       return res.status(400).json({ message: "date and students array are required" });
     }
@@ -620,14 +621,20 @@ export const markDailyAttendance = async (req, res) => {
     const month = date.slice(0, 7); // "YYYY-MM"
     const results = [];
 
-    // Tutors may only mark attendance for students of their own center
-    let tutorCenterId = null;
+    // Tutors may only mark attendance for students of their own centers
+    let allowedCenters = null;
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter) {
+      allowedCenters = tutorCenterIds(tutor);
+      if (!allowedCenters.length) {
         return res.status(403).json({ message: 'No center assigned to this tutor' });
       }
-      tutorCenterId = tutor.assignedCenter.toString();
+    }
+    if (centerId) {
+      allowedCenters = (allowedCenters || [String(centerId)]).filter(id => id === String(centerId));
+      if (!allowedCenters.length) {
+        return res.status(403).json({ message: 'Not authorized for this center' });
+      }
     }
 
     for (const { studentId, status } of students) {
@@ -637,7 +644,7 @@ export const markDailyAttendance = async (req, res) => {
           results.push({ studentId, status: "Student not found" });
           continue;
         }
-        if (tutorCenterId && student.assignedCenter.toString() !== tutorCenterId) {
+        if (allowedCenters && !allowedCenters.includes(student.assignedCenter.toString())) {
           results.push({ studentId, status: "Not authorized" });
           continue;
         }
@@ -723,11 +730,10 @@ export const markAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Check if tutor belongs to the same center as the student
+    // Check the student is in one of the tutor's centers
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter || 
-          student.assignedCenter.toString() !== tutor.assignedCenter.toString()) {
+      if (!tutorOwnsStudent(tutor, student)) {
         return res.status(403).json({ message: 'Not authorized to mark attendance for this student' });
       }
     }
@@ -767,11 +773,10 @@ export const getStudentAttendanceReport = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Check if tutor belongs to the same center as the student
+    // Check the student is in one of the tutor's centers
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter || 
-          student.assignedCenter.toString() !== tutor.assignedCenter.toString()) {
+      if (!tutorOwnsStudent(tutor, student)) {
         return res.status(403).json({ message: 'Not authorized to access this student\'s attendance' });
       }
     }
@@ -858,11 +863,10 @@ export const getStudentProgress = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
     
-    // Check if tutor belongs to the same center as the student
+    // Check the student is in one of the tutor's centers
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || !tutor.assignedCenter || 
-          student.assignedCenter.toString() !== tutor.assignedCenter.toString()) {
+      if (!tutorOwnsStudent(tutor, student)) {
         return res.status(403).json({ message: 'Not authorized to access this student\'s progress' });
       }
     }

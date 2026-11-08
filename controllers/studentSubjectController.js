@@ -2,13 +2,13 @@
 import Student from '../models/Student.js';
 import Subject from '../models/Subject.js';
 import mongoose from 'mongoose';
+import { tutorHasCenter } from '../utils/tutorCenters.js';
 
-// Tutors may only touch students in their own center; other roles are checked by the route
+// Tutors may only touch students in their own centers; other roles are checked by the route
 const tutorCanAccessStudent = async (req, studentId) => {
   if (req.role !== 'tutor') return true;
-  if (!req.user.assignedCenter) return false;
   const student = await Student.findById(studentId).select('assignedCenter').lean();
-  return !!student && String(student.assignedCenter) === String(req.user.assignedCenter);
+  return !!student && tutorHasCenter(req.user, student.assignedCenter);
 };
 
 export const createStudentSubjectRecord = async (req, res) => {
