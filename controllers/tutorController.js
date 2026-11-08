@@ -10,8 +10,13 @@ import { queueAttendanceEmail } from '../utils/emailQueue.js';
 const getFilePath = (files, field) => files[field] && files[field][0] ? files[field][0].path.replace(/\\/g, '/') : null;
 const getFilePaths = (files, field) => files[field] ? files[field].map(f => f.path.replace(/\\/g, '/')) : null;
 
-import mongoose from 'mongoose';  
+import mongoose from 'mongoose';
 import { istToday, istDayOfWeek } from '../utils/istTime.js';
+import { tutorCenterIds, tutorHasCenter, assignmentsPopulate, parseAssignments } from '../utils/tutorCenters.js';
+
+// Comma-separated names of a tutor's populated centers
+const centerNamesOf = (tutor) =>
+  (tutor.assignments || []).map(a => a.center?.name).filter(Boolean).join(', ') || 'Unknown Center';
 
 // @desc    Get all tutors
 // @route   GET /api/tutors
@@ -20,14 +25,14 @@ export const getTutors = async (req, res) => {
   try {
     // Add lean() for faster queries and limit populated fields
     const tutors = await Tutor.find()
-      .populate('assignedCenter', 'name location')
+      .populate(assignmentsPopulate())
       .select('-password -documents -__v')
       .lean(); // Convert to plain JS objects (faster)
-    
+
     // Map center names without additional student population
     const tutorsWithCenterName = tutors.map(tutor => ({
       ...tutor,
-      centerName: tutor.assignedCenter?.name || "Unknown Center",
+      centerName: centerNamesOf(tutor),
       studentCount: tutor.students?.length || 0 // Just count, don't populate full data
     }));
     
@@ -43,7 +48,7 @@ export const getTutors = async (req, res) => {
 export const getTutor = async (req, res) => {
   try {
     const tutor = await Tutor.findById(req.params.id)
-      .populate('assignedCenter', 'name location').populate({
+      .populate(assignmentsPopulate()).populate({
         path: 'students',
         match: { status: 'active' }, // Only populate active students
         select: 'name fatherName contact'
@@ -54,7 +59,7 @@ export const getTutor = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to view this tutor' });
     }
     const tutorObj = tutor.toObject();
-    tutorObj.centerName = tutorObj.assignedCenter?.name || "Unknown Center";
+    tutorObj.centerName = centerNamesOf(tutorObj);
     res.json(tutorObj);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -74,18 +79,18 @@ export const getTutorsByCenter = async (req, res) => {
       return res.status(404).json({ message: 'Center not found' });
     }
 
-    // If tutor is requesting, they must belong to the same center
+    // If tutor is requesting, they must be assigned to this center
     if (req.role === 'tutor') {
       const tutor = await Tutor.findById(req.user._id);
-      if (!tutor || tutor.assignedCenter.toString() !== centerId) {
+      if (!tutor || !tutorHasCenter(tutor, centerId)) {
         return res.status(403).json({ message: 'Not authorized to view tutors from this center' });
       }
     }
 
-    // Get all active tutors for this center
-    const tutors = await Tutor.find({ assignedCenter: centerId })
-      .populate('assignedCenter', 'name location')
-      .select('_id name contact email assignedCenter');
+    // Get all tutors assigned to this center
+    const tutors = await Tutor.find({ 'assignments.center': centerId })
+      .populate(assignmentsPopulate())
+      .select('_id name contact email assignments');
 
     res.json(tutors);
   } catch (error) {
@@ -100,14 +105,29 @@ const normalizeIdArray = (value) => {
   return [value];
 };
 
+// Parse req.body.assignments and check every center exists.
+// Returns { assignments } or { status, message } for the error response.
+const readAssignments = async (body, { required }) => {
+  const parsed = parseAssignments(body);
+  if (!parsed) {
+    return required ? { status: 400, message: 'At least one center assignment is required' } : { assignments: null };
+  }
+  if (parsed.error) return { status: 400, message: parsed.error };
+
+  const ids = parsed.assignments.map(a => a.center);
+  const found = await Center.countDocuments({ _id: { $in: ids } });
+  if (found !== ids.length) return { status: 404, message: 'Assigned center not found' };
+  return parsed;
+};
+
 // @desc    Create tutor
 // @route   POST /api/tutors
 // @access  Private/Admin
 export const createTutor = async (req, res) => {
   try {
     const {
-      name, email, phone, password, address, qualifications, assignedCenter, subjects,
-      sessionType, sessionTiming, assignedHadiyaAmount, aadharNumber,
+      name, email, phone, password, address, qualifications, subjects,
+      assignedHadiyaAmount, aadharNumber,
       bankName, accountNumber, bankBranch, ifscCode,
       // Educational Details
       qualificationType, qualificationOther, qualificationStatus,
@@ -122,6 +142,9 @@ export const createTutor = async (req, res) => {
     if (!password || password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
+
+    const { assignments, status: errStatus, message: errMessage } = await readAssignments(req.body, { required: true });
+    if (errStatus) return res.status(errStatus).json({ message: errMessage });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -156,12 +179,9 @@ export const createTutor = async (req, res) => {
       madarsahName: madarsahName || '',
       collegeName: collegeName || '',
       specialization: specialization || '',
-      // Center & Subject Information
-      assignedCenter,
+      // Centers (each with its session) & Subject Information
+      assignments,
       subjects: subjectsArray,
-      // Session Information
-      sessionType,
-      sessionTiming,
       joiningDate: joiningDate || Date.now(),
       // Hadiya Information
       assignedHadiyaAmount: assignedHadiyaAmount || 0,
@@ -176,7 +196,7 @@ export const createTutor = async (req, res) => {
       students: studentsArray
     });
 
-    await Center.findByIdAndUpdate(tutor.assignedCenter, { $addToSet: { tutors: tutor._id } });
+    await Center.updateMany({ _id: { $in: tutorCenterIds(tutor) } }, { $addToSet: { tutors: tutor._id } });
 
     res.status(201).json({
       _id: tutor._id,
@@ -184,7 +204,7 @@ export const createTutor = async (req, res) => {
       email: tutor.email,
       phone: tutor.phone,
       role: tutor.role,
-      assignedCenter: tutor.assignedCenter,
+      assignments: tutor.assignments,
       collegeName: tutor.collegeName,
       students: tutor.students
     });
@@ -233,8 +253,10 @@ export const updateTutor = async (req, res) => {
     if (req.body.collegeName) updateData.collegeName = req.body.collegeName;
     if (req.body.specialization) updateData.specialization = req.body.specialization;
 
-    // Center & Subject Information
-    if (req.body.assignedCenter) updateData.assignedCenter = req.body.assignedCenter;
+    // Centers (each with its session) & Subject Information
+    const { assignments, status: errStatus, message: errMessage } = await readAssignments(req.body, { required: false });
+    if (errStatus) return res.status(errStatus).json({ message: errMessage });
+    if (assignments) updateData.assignments = assignments;
     if (req.body.subjects) {
       updateData.subjects = Array.isArray(req.body.subjects)
         ? req.body.subjects
@@ -260,10 +282,6 @@ export const updateTutor = async (req, res) => {
     if (studentsReplace) {
       updateData.students = studentsReplace; // full replacement
     }
-
-    // Session Information
-    if (req.body.sessionType) updateData.sessionType = req.body.sessionType;
-    if (req.body.sessionTiming) updateData.sessionTiming = req.body.sessionTiming;
 
     // Hadiya Information
     if (req.body.assignedHadiyaAmount !== undefined)
@@ -301,28 +319,14 @@ export const updateTutor = async (req, res) => {
       updateData.password = hashedPassword;
     }
 
-    // Center change logic
-    if (
-      req.body.assignedCenter &&
-      (tutor.assignedCenter === null ||
-        req.body.assignedCenter !== tutor.assignedCenter.toString())
-    ) {
-      if (tutor.assignedCenter) {
-        const oldCenter = await Center.findById(tutor.assignedCenter);
-        if (oldCenter) {
-          oldCenter.tutors = oldCenter.tutors.filter(
-            (id) => id.toString() !== tutor._id.toString()
-          );
-          await oldCenter.save();
-        }
-      }
-      const newCenter = await Center.findById(req.body.assignedCenter);
-      if (!newCenter) {
-        res.status(404).json({ message: 'New center not found' });
-        return;
-      }
-      newCenter.tutors.push(tutor._id);
-      await newCenter.save();
+    // Center change logic: keep each center's tutors list in sync
+    if (assignments) {
+      const oldIds = tutorCenterIds(tutor);
+      const newIds = assignments.map(a => a.center);
+      const removed = oldIds.filter(id => !newIds.includes(id));
+      const added = newIds.filter(id => !oldIds.includes(id));
+      if (removed.length) await Center.updateMany({ _id: { $in: removed } }, { $pull: { tutors: tutor._id } });
+      if (added.length) await Center.updateMany({ _id: { $in: added } }, { $addToSet: { tutors: tutor._id } });
     }
 
     // Status changes only when the admin sets it explicitly. (It used to be recomputed from
@@ -347,7 +351,7 @@ export const updateTutor = async (req, res) => {
 
     const updatedTutor = await Tutor.findById(req.params.id)
       .select('-password')
-      .populate('assignedCenter', 'name location')
+      .populate(assignmentsPopulate())
       .populate('students', '_id name phone');
 
     if (!updatedTutor) {
@@ -356,7 +360,7 @@ export const updateTutor = async (req, res) => {
     }
 
     const tutorResponse = updatedTutor.toObject();
-    tutorResponse.centerName = tutorResponse.assignedCenter?.name || 'Unknown Center';
+    tutorResponse.centerName = centerNamesOf(tutorResponse);
     tutorResponse.collegeName = tutorResponse.collegeName;
 
     res.json(tutorResponse);
@@ -386,12 +390,8 @@ export const deleteTutor = async (req, res) => {
       return res.status(404).json({ message: 'Tutor not found' });
     }
 
-    // Remove tutor from center
-    const center = await Center.findById(tutor.assignedCenter);
-    if (center) {
-      center.tutors = center.tutors.filter(id => id.toString() !== tutor._id.toString());
-      await center.save();
-    }
+    // Remove tutor from all their centers
+    await Center.updateMany({ _id: { $in: tutorCenterIds(tutor) } }, { $pull: { tutors: tutor._id } });
     if(tutor.status === 'inactive') {
       await tutor.deleteOne();
       return res.json({ message: 'Tutor permanently deleted' });

@@ -19,8 +19,17 @@ import {
   getTutorCenter
 } from '../controllers/tutorController.js';
 import { uploadTutorDocuments } from '../middleware/uploadMiddleware.js';
+import { parseAssignments } from '../utils/tutorCenters.js';
 
 const router = express.Router();
+
+// assignments: [{ center, sessionType, sessionTiming }], or that array as a JSON string
+const validAssignments = (value) => {
+  const parsed = parseAssignments({ assignments: value });
+  if (!parsed) throw new Error('At least one center assignment is required');
+  if (parsed.error) throw new Error(parsed.error);
+  return true;
+};
 
 // Multer fields config for tutor docs
 const tutorUploadFields = [
@@ -37,7 +46,7 @@ const tutorValidation = [
   body('email').isEmail().withMessage('Please enter a valid email'),
   body('phone').matches(/^[0-9]{10}$/).withMessage('Please enter a valid 10-digit phone number'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-  body('assignedCenter').isMongoId().withMessage('Invalid center ID'),
+  body('assignments').custom(validAssignments),
   // Custom validation for subjects that handles both string and array
   body('subjects').custom((value) => {
     // Allow either a string (single subject) or array (multiple subjects)
@@ -50,10 +59,6 @@ const tutorValidation = [
     }
     throw new Error('At least one subject is required');
   }),
-  body('sessionType').isIn(['arabic', 'tuition']).withMessage('Invalid session type'),
-  body('sessionTiming')
-    .isIn(['after_fajr', 'after_zohar', 'after_asar', 'after_maghrib', 'after_isha'])
-    .withMessage('Invalid session timing'),
   // Educational fields - optional
   body('qualifications').optional(),
   body('qualificationType').optional().isIn(['graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others']).withMessage('Invalid qualification type'),
@@ -83,7 +88,7 @@ const updateValidation = [
   body('email').optional().isEmail().withMessage('Please enter a valid email'),
   body('phone').optional().matches(/^[0-9]{10}$/).withMessage('Please enter a valid 10-digit phone number'),
   body('qualifications').optional().notEmpty().withMessage('Qualifications cannot be empty'),
-  body('assignedCenter').optional().isMongoId().withMessage('Invalid center ID'),
+  body('assignments').optional().custom(validAssignments),
   // Custom validation for subjects that handles both string and array
   body('subjects').optional().custom((value) => {
     // Skip validation if value is undefined or null
@@ -100,10 +105,6 @@ const updateValidation = [
     }
     throw new Error('If subjects are provided, at least one is required');
   }),
-  body('sessionType').optional().isIn(['arabic', 'tuition']).withMessage('Invalid session type'),
-  body('sessionTiming').optional()
-    .isIn(['after_fajr', 'after_zohar', 'after_asar', 'after_maghrib', 'after_isha'])
-    .withMessage('Invalid session timing'),
   // Educational fields for update - optional
   body('qualificationType').optional().isIn(['graduation', 'intermediate', 'ssc', 'alim', 'hafiz', 'others']).withMessage('Invalid qualification type'),
   body('qualificationOther').optional().isLength({ max: 50 }).withMessage('Qualification details cannot exceed 50 characters'),
@@ -240,7 +241,8 @@ router.post('/test-attendance-email', adminOnly, [
   try {
     const { queueAttendanceEmail } = await import('../utils/emailQueue.js');
     const Tutor = (await import('../models/Tutor.js')).default;
-    const tutor = await Tutor.findById(req.body.tutorId).populate('assignedCenter', 'name location');
+    const tutor = await Tutor.findById(req.body.tutorId).populate('assignments.center', 'name location');
+    const center = tutor?.assignments?.[0]?.center;
     
     if (!tutor) {
       return res.status(404).json({ message: 'Tutor not found' });
@@ -256,9 +258,9 @@ router.post('/test-attendance-email', adminOnly, [
       tutorName: tutor.name,
       date: currentTime,
       time: currentTime,
-      centerName: tutor.assignedCenter?.name || 'Test Center',
+      centerName: center?.name || 'Test Center',
       location: [28.6139, 77.2090], // Sample Delhi coordinates
-      address: tutor.assignedCenter?.location || 'Test Address, Delhi'
+      address: center?.location || 'Test Address, Delhi'
     });
     
     res.json({ 
@@ -323,7 +325,8 @@ router.post('/test-attendance-email', adminOnly, [
   try {
     const { queueAttendanceEmail } = await import('../utils/emailQueue.js');
     const Tutor = (await import('../models/Tutor.js')).default;
-    const tutor = await Tutor.findById(req.body.tutorId).populate('assignedCenter', 'name location');
+    const tutor = await Tutor.findById(req.body.tutorId).populate('assignments.center', 'name location');
+    const center = tutor?.assignments?.[0]?.center;
     
     if (!tutor) {
       return res.status(404).json({ message: 'Tutor not found' });
@@ -339,9 +342,9 @@ router.post('/test-attendance-email', adminOnly, [
       tutorName: tutor.name,
       date: currentTime,
       time: currentTime,
-      centerName: tutor.assignedCenter?.name || 'Test Center',
+      centerName: center?.name || 'Test Center',
       location: [28.6139, 77.2090], // Sample Delhi coordinates
-      address: tutor.assignedCenter?.location || 'Test Address, Delhi'
+      address: center?.location || 'Test Address, Delhi'
     });
     
     res.json({ 
