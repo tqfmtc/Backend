@@ -33,8 +33,8 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create a compound index to ensure one attendance record per tutor per day
-attendanceSchema.index({ tutor: 1, date: 1 }, { unique: true });
+// One attendance record per tutor per center per day (a tutor can teach at several centers)
+attendanceSchema.index({ tutor: 1, center: 1, date: 1 }, { unique: true });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 

@@ -2,6 +2,31 @@ import mongoose from 'mongoose';
 import passwordChangedAt from './plugins/passwordChangedAt.js';
 import bcrypt from 'bcryptjs';
 
+// One entry per center the tutor teaches at, with that center's session
+export const SESSION_TYPES = ['arabic', 'tuition'];
+export const SESSION_TIMINGS = ['after_fajr', 'after_zohar', 'after_asar', 'after_maghrib', 'after_isha'];
+
+const assignmentSchema = mongoose.Schema(
+  {
+    center: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Center',
+      required: true
+    },
+    sessionType: {
+      type: String,
+      enum: SESSION_TYPES,
+      required: true
+    },
+    sessionTiming: {
+      type: String,
+      enum: SESSION_TIMINGS,
+      required: true
+    }
+  },
+  { _id: false }
+);
+
 const tutorSchema = mongoose.Schema(
   {
     // Personal Information - from AddTutorForm
@@ -73,10 +98,14 @@ const tutorSchema = mongoose.Schema(
     },
     
     // Center & Subject Information - from AddTutorForm
-    assignedCenter: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Center',
-      required: true
+    // Not required at schema level: a tutor whose only center was deleted keeps an empty
+    // list (and must still be savable, e.g. for hadiya records). Create/update require one.
+    assignments: {
+      type: [assignmentSchema],
+      validate: {
+        validator: (list) => new Set(list.map(a => String(a.center))).size === list.length,
+        message: 'A tutor can be assigned to each center only once'
+      }
     },
     students: [{
       type: mongoose.Schema.Types.ObjectId,
@@ -86,18 +115,7 @@ const tutorSchema = mongoose.Schema(
       type: String,
       required: true
     }],
-    
-    // Session Information - from AddTutorForm
-    sessionType: {
-      type: String,
-      enum: ['arabic', 'tuition'],
-      required: true
-    },
-    sessionTiming: {
-      type: String,
-      enum: ['after_fajr', 'after_zohar', 'after_asar', 'after_maghrib', 'after_isha'],
-      required: true
-    },
+
     joiningDate: {
     type: Date,
     default: Date.now
@@ -192,6 +210,7 @@ const tutorSchema = mongoose.Schema(
 
 // Create indexes for geospatial queries
 tutorSchema.index({ 'attendance.location': '2dsphere' });
+tutorSchema.index({ 'assignments.center': 1 });
 
 // Hash password before saving
 // We handle password hashing in the controller now
