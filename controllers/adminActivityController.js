@@ -1,5 +1,15 @@
 import AdminActivity from '../models/AdminActivity.js';
 
+// A tutor's populated centers as one { name, area }, names and areas comma-joined
+const tutorCentersSummary = (tutor) => {
+  const centers = (tutor.assignments || []).map(a => a.center).filter(Boolean);
+  if (!centers.length) return null;
+  return {
+    name: centers.map(c => c.name).join(', '),
+    area: [...new Set(centers.map(c => c.area).filter(Boolean))].join(', ')
+  };
+};
+
 // Helper function to format action names
 const formatActionName = (action) => {
   const actionMap = {
@@ -148,7 +158,7 @@ export const getAdminActivities = async (req, res) => {
             case 'Tutor':
               const Tutor = (await import('../models/Tutor.js')).default;
               const tutor = await Tutor.findById(activity.targetId)
-                .populate('assignedCenter', 'name area')
+                .populate('assignments.center', 'name area')
                 .lean();
               if (tutor) {
                 targetInfo = {
@@ -156,10 +166,7 @@ export const getAdminActivities = async (req, res) => {
                   name: tutor.name,
                   phone: tutor.phone,
                   email: tutor.email,
-                  center: tutor.assignedCenter ? {
-                    name: tutor.assignedCenter.name,
-                    area: tutor.assignedCenter.area
-                  } : null,
+                  center: tutorCentersSummary(tutor),
                   status: tutor.status
                 };
               }
@@ -275,7 +282,7 @@ export const getActivityStats = async (req, res) => {
             case 'Tutor':
               const Tutor = (await import('../models/Tutor.js')).default;
               const tutor = await Tutor.findById(activity.targetId)
-                .populate('assignedCenter', 'name area')
+                .populate('assignments.center', 'name area')
                 .lean();
               if (tutor) {
                 targetInfo = {
@@ -283,10 +290,7 @@ export const getActivityStats = async (req, res) => {
                   name: tutor.name,
                   phone: tutor.phone,
                   email: tutor.email,
-                  center: tutor.assignedCenter ? {
-                    name: tutor.assignedCenter.name,
-                    area: tutor.assignedCenter.area
-                  } : null,
+                  center: tutorCentersSummary(tutor),
                   status: tutor.status
                 };
               }

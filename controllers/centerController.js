@@ -195,10 +195,10 @@ export const deleteCenter = async (req, res) => {
     );
     console.log(`Deactivated ${deactivatedStudentsResult.modifiedCount} students associated with center ${center._id}`);
 
-    // Remove center references from any tutors assigned to this center
+    // Remove this center from any tutors assigned to it (their other centers stay)
     const tutorsUpdated = await Tutor.updateMany(
-      { assignedCenter: center._id },
-      { $set: { assignedCenter: null } }
+      { 'assignments.center': center._id },
+      { $pull: { assignments: { center: center._id } } }
     );
     console.log(`Updated ${tutorsUpdated.modifiedCount} tutors to remove center reference`);
 

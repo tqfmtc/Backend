@@ -108,7 +108,7 @@ export const getHadiyaReport = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(centerId)) {
           return res.status(400).json({ message: 'Invalid Center ID format' });
         }
-        query.assignedCenter = centerId;
+        query['assignments.center'] = centerId;
       }
       if (tutorName) {
         query.name = { $regex: tutorName.trim(), $options: 'i' }; // Case-insensitive search for name
@@ -117,8 +117,8 @@ export const getHadiyaReport = async (req, res) => {
     // If no filters, it will fetch for all tutors
 
     const tutors = await Tutor.find(query)
-      .populate('assignedCenter', 'name')
-      .select('name email phone assignedCenter assignedHadiyaAmount hadiyaRecords'); // Select necessary fields
+      .populate('assignments.center', 'name')
+      .select('name email phone assignments assignedHadiyaAmount hadiyaRecords'); // Select necessary fields
 
     if (!tutors || tutors.length === 0) {
       return res.status(404).json({ message: 'No tutors found matching criteria.' });
@@ -140,13 +140,22 @@ export const getHadiyaReport = async (req, res) => {
 
       // Calculate total paid for the filtered records for this tutor
       const totalPaidForTutorFiltered = relevantRecords.reduce((sum, record) => sum + record.amountPaid, 0);
-      
+
+      // Hadiya is per tutor; centers are listed for display only
+      const centers = tutor.assignments
+        .filter(a => a.center)
+        .map(a => ({ _id: a.center._id, name: a.center.name }));
+
       return {
         tutorId: tutor._id,
         tutorName: tutor.name,
         tutorEmail: tutor.email,
         tutorPhone: tutor.phone,
-        assignedCenter: tutor.assignedCenter ? { _id: tutor.assignedCenter._id, name: tutor.assignedCenter.name } : {name: 'N/A'},
+        centers,
+        // All center names joined; _id is the first center
+        assignedCenter: centers.length
+          ? { _id: centers[0]._id, name: centers.map(c => c.name).join(', ') }
+          : { name: 'N/A' },
         assignedHadiyaAmount: tutor.assignedHadiyaAmount,
         hadiyaRecords: relevantRecords, // Records for the specified month/year or all if not specified
         totalPaidFiltered: totalPaidForTutorFiltered // Total paid for this tutor for the filtered period

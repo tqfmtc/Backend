@@ -79,7 +79,7 @@ export const tutorLogin = async (req, res) => {
 
     // Find tutor by phone number, explicitly selecting the password field
     const tutor = await Tutor.findOne({ phone }).select('+password')
-      .populate('assignedCenter', 'name location coordinates');
+      .populate('assignments.center', 'name location coordinates');
 
     if (!tutor) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -111,6 +111,16 @@ export const tutorLogin = async (req, res) => {
     const token = generateToken(tutor._id, 'tutor');
 
     // Prepare response with tutor and center data
+    const assignedCenters = tutor.assignments
+      .filter(a => a.center)
+      .map(({ center, sessionType, sessionTiming }) => ({
+        _id: center._id,
+        name: center.name,
+        location: center.location,
+        coordinates: center.coordinates,
+        sessionType,
+        sessionTiming
+      }));
     const response = {
       _id: tutor._id,
       name: tutor.name,
@@ -118,12 +128,9 @@ export const tutorLogin = async (req, res) => {
       phone: tutor.phone,
       role: tutor.role,
       token,
-      assignedCenter: tutor.assignedCenter ? {
-        _id: tutor.assignedCenter._id,
-        name: tutor.assignedCenter.name,
-        location: tutor.assignedCenter.location,
-        coordinates: tutor.assignedCenter.coordinates
-      } : null
+      assignedCenters,
+      // First center only, for app versions <= 3.1.1 that expect a single center
+      assignedCenter: assignedCenters[0] || null
     };
 
     res.json(response);
